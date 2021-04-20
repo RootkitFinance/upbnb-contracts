@@ -9,9 +9,9 @@ import "./TokensRecoverable.sol";
 import "./SafeMath.sol";
 import "./IERC31337.sol";
 import "./IERC20.sol";
-import "./IUniswapV2Router02.sol";
-import "./IUniswapV2Factory.sol";
-import "./IUniswapV2Pair.sol";
+import "./IPancakeRouter02.sol";
+import "./IPancakeFactory.sol";
+import "./IPancakePair.sol";
 import "./SafeERC20.sol";
 
 /*
@@ -57,15 +57,15 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     bool public override distributionComplete;
 
     IMarketGeneration public marketGeneration;
-    IUniswapV2Router02 uniswapV2Router;
-    IUniswapV2Factory uniswapV2Factory;
+    IPancakeRouter02 pancakeRouter;
+    IPancakeFactory pancakeFactory;
     RootedToken public rootedToken;
     IERC31337 public eliteToken;
     IERC20 public baseToken;
     address public immutable devAddress;
     address public liquidityController;
-    IUniswapV2Pair public rootedEliteLP;
-    IUniswapV2Pair public rootedBaseLP;
+    IPancakePair public rootedEliteLP;
+    IPancakePair public rootedBaseLP;
 
     uint256 public constant rootedTokenSupply = 1e25; // 10 million
 
@@ -96,7 +96,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         RootedToken _rootedToken, 
         IERC31337 _eliteToken, 
         address _liquidityController,
-        IUniswapV2Router02 _uniswapV2Router, 
+        IPancakeRouter02 _pancakeRouter, 
         IMarketGeneration _marketGeneration,
         uint256 _vestingDuration, 
         uint16 _devCutPercent, 
@@ -108,8 +108,8 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         eliteToken = _eliteToken;
         baseToken = _eliteToken.wrappedToken();
         liquidityController = _liquidityController;
-        uniswapV2Router = _uniswapV2Router;
-        uniswapV2Factory = IUniswapV2Factory(_uniswapV2Router.factory());
+        pancakeRouter = _pancakeRouter;
+        pancakeFactory = IPancakeFactory(_pancakeRouter.factory());
         marketGeneration = _marketGeneration;
         vestingDuration = _vestingDuration;
         devCutPercent = _devCutPercent;
@@ -120,20 +120,20 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
     function setupEliteRooted() public
     {
-        rootedEliteLP = IUniswapV2Pair(uniswapV2Factory.getPair(address(eliteToken), address(rootedToken)));
+        rootedEliteLP = IPancakePair(pancakeFactory.getPair(address(eliteToken), address(rootedToken)));
         if (address(rootedEliteLP) == address(0)) 
         {
-            rootedEliteLP = IUniswapV2Pair(uniswapV2Factory.createPair(address(eliteToken), address(rootedToken)));
+            rootedEliteLP = IPancakePair(pancakeFactory.createPair(address(eliteToken), address(rootedToken)));
             require (address(rootedEliteLP) != address(0));
         }
     }
 
     function setupBaseRooted() public
     {
-        rootedBaseLP = IUniswapV2Pair(uniswapV2Factory.getPair(address(baseToken), address(rootedToken)));
+        rootedBaseLP = IPancakePair(pancakeFactory.getPair(address(baseToken), address(rootedToken)));
         if (address(rootedBaseLP) == address(0)) 
         {
-            rootedBaseLP = IUniswapV2Pair(uniswapV2Factory.createPair(address(baseToken), address(rootedToken)));
+            rootedBaseLP = IPancakePair(pancakeFactory.createPair(address(baseToken), address(rootedToken)));
             require (address(rootedBaseLP) != address(0));
         }
     }
@@ -143,12 +143,12 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         require (address(rootedEliteLP) != address(0), "Rooted Elite pool is not created");
         require (address(rootedBaseLP) != address(0), "Rooted Base pool is not created");   
 
-        eliteToken.approve(address(uniswapV2Router), uint256(-1));
-        rootedToken.approve(address(uniswapV2Router), uint256(-1));
-        baseToken.safeApprove(address(uniswapV2Router), uint256(-1));
+        eliteToken.approve(address(pancakeRouter), uint256(-1));
+        rootedToken.approve(address(pancakeRouter), uint256(-1));
+        baseToken.safeApprove(address(pancakeRouter), uint256(-1));
         baseToken.safeApprove(address(eliteToken), uint256(-1));
-        rootedBaseLP.approve(address(uniswapV2Router), uint256(-1));
-        rootedEliteLP.approve(address(uniswapV2Router), uint256(-1));
+        rootedBaseLP.approve(address(pancakeRouter), uint256(-1));
+        rootedEliteLP.approve(address(pancakeRouter), uint256(-1));
     }
 
     function distribute() public override
@@ -190,19 +190,19 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     {
         // Create Rooted/Elite LP 
         eliteToken.depositTokens(baseToken.balanceOf(address(this)));
-        uniswapV2Router.addLiquidity(address(eliteToken), address(rootedToken), eliteToken.balanceOf(address(this)), rootedToken.totalSupply(), 0, 0, address(this), block.timestamp);
+        pancakeRouter.addLiquidity(address(eliteToken), address(rootedToken), eliteToken.balanceOf(address(this)), rootedToken.totalSupply(), 0, 0, address(this), block.timestamp);
     }
 
     function buyTheBottom() private
     {
         uint256 amount = totalBaseTokenCollected * preBuyForMarketStabilizationPercent / 10000;  
-        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);        
+        uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);        
         rootedBottom = amounts[1];
     }
 
     function sellTheTop() private
     {
-        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(rootedBottom, 0, rootedElitePath(), address(this), block.timestamp);
+        uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(rootedBottom, 0, rootedElitePath(), address(this), block.timestamp);
         uint256 eliteAmount = amounts[1];
         eliteToken.withdrawTokens(eliteAmount);
     }   
@@ -210,7 +210,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     function preBuyForReferrals() private 
     {
         uint256 amount = totalBaseTokenCollected * preBuyForReferralsPercent / 10000;
-        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
+        uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
         totalBoughtForReferrals = amounts[1];
     }
 
@@ -219,7 +219,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         uint256 preBuyAmount = totalBaseTokenCollected * preBuyForContributorsPercent / 10000;
         uint256 eliteBalance = eliteToken.balanceOf(address(this));
         uint256 amount = preBuyAmount > eliteBalance ? eliteBalance : preBuyAmount;
-        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
+        uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
         totalBoughtForContributors = amounts[1];
     }
 
@@ -228,13 +228,13 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         uint256 elitePerLpToken = eliteToken.balanceOf(address(rootedEliteLP)).mul(1e18).div(rootedEliteLP.totalSupply());
         uint256 lpAmountToRemove = baseToken.balanceOf(address(eliteToken)).mul(1e18).div(elitePerLpToken);
         
-        (uint256 eliteAmount, uint256 rootedAmount) = uniswapV2Router.removeLiquidity(address(eliteToken), address(rootedToken), lpAmountToRemove, 0, 0, address(this), block.timestamp);
+        (uint256 eliteAmount, uint256 rootedAmount) = pancakeRouter.removeLiquidity(address(eliteToken), address(rootedToken), lpAmountToRemove, 0, 0, address(this), block.timestamp);
         
         uint256 baseInElite = baseToken.balanceOf(address(eliteToken));
         uint256 baseAmount = eliteAmount > baseInElite ? baseInElite : eliteAmount;       
         
         eliteToken.withdrawTokens(baseAmount);
-        uniswapV2Router.addLiquidity(address(baseToken), address(rootedToken), baseAmount, rootedAmount, 0, 0, liquidityController, block.timestamp);
+        pancakeRouter.addLiquidity(address(baseToken), address(rootedToken), baseAmount, rootedAmount, 0, 0, liquidityController, block.timestamp);
         rootedEliteLP.transfer(liquidityController, rootedEliteLP.balanceOf(address(this)));
         eliteToken.transfer(liquidityController, eliteToken.balanceOf(address(this)));
     }

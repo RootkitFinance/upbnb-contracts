@@ -8,8 +8,8 @@ Ensures 100% of accessible funds are backed at all times
 
 import "./IFloorCalculator.sol";
 import "./SafeMath.sol";
-import "./UniswapV2Library.sol";
-import "./IUniswapV2Factory.sol";
+import "./PancakeLibrary.sol";
+import "./IPancakeFactory.sol";
 import "./TokensRecoverable.sol";
 import "./EnumerableSet.sol";
 
@@ -19,13 +19,13 @@ contract EliteFloorCalculator is IFloorCalculator, TokensRecoverable
     using EnumerableSet for EnumerableSet.AddressSet;
 
     IERC20 immutable rootedToken;
-    IUniswapV2Factory immutable uniswapV2Factory;
+    IPancakeFactory immutable pancakeFactory;
     EnumerableSet.AddressSet ignoredAddresses;
 
-    constructor(IERC20 _rootedToken, IUniswapV2Factory _uniswapV2Factory)
+    constructor(IERC20 _rootedToken, IPancakeFactory _pancakeFactory)
     {
         rootedToken = _rootedToken;
-        uniswapV2Factory = _uniswapV2Factory;
+        pancakeFactory = _pancakeFactory;
     }    
 
     function setIgnoreAddresses(address ignoredAddress, bool add) public ownerOnly()
@@ -76,7 +76,7 @@ contract EliteFloorCalculator is IFloorCalculator, TokensRecoverable
             address[] memory path = new address[](2);
             path[0] = address(rootedToken);
             path[1] = address(token);
-            uint256[] memory amountsOut = UniswapV2Library.getAmountsOut(address(uniswapV2Factory), freeRootedToken, path);
+            uint256[] memory amountsOut = PancakeLibrary.getAmountsOut(address(pancakeFactory), freeRootedToken, path);
             sellAllProceeds = amountsOut[1];
         }
 
@@ -89,8 +89,8 @@ contract EliteFloorCalculator is IFloorCalculator, TokensRecoverable
 
     function calculateExcessInPools(IERC20 baseToken, IERC20 eliteToken) public view returns (uint256)
     {
-        address rootedElitePair = UniswapV2Library.pairFor(address(uniswapV2Factory), address(rootedToken), address(eliteToken));
-        address rootedBasePair = UniswapV2Library.pairFor(address(uniswapV2Factory), address(rootedToken), address(baseToken));   
+        address rootedElitePair = PancakeLibrary.pairFor(address(pancakeFactory), address(rootedToken), address(eliteToken));
+        address rootedBasePair = PancakeLibrary.pairFor(address(pancakeFactory), address(rootedToken), address(baseToken));   
         
         uint256 rootedTokenTotalSupply = rootedToken.totalSupply().sub(ignoredAddressesTotalBalance());
         uint256 rootedTokenPoolsLiquidity = rootedToken.balanceOf(rootedElitePair).add(rootedToken.balanceOf(rootedBasePair));

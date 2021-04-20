@@ -3,10 +3,10 @@ pragma solidity ^0.7.4;
 
 import "./TokensRecoverable.sol";
 import "./IERC31337.sol";
-import "./IUniswapV2Router02.sol";
+import "./IPancakeRouter02.sol";
 import "./IERC20.sol";
 import "./RootedTransferGate.sol";
-import "./IUniswapV2Factory.sol";
+import "./IPancakeFactory.sol";
 import "./SafeMath.sol";
 import "./ILiquidityController.sol";
 import "./IFloorCalculator.sol";
@@ -15,8 +15,8 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
 {
     using SafeMath for uint256;
 
-    IUniswapV2Router02 immutable uniswapV2Router;
-    IUniswapV2Factory immutable uniswapV2Factory;
+    IPancakeRouter02 immutable pancakeRouter;
+    IPancakeFactory immutable pancakeFactory;
     IERC20 immutable rooted;
     IERC20 immutable base;
     IERC31337 immutable elite;
@@ -26,26 +26,26 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
     RootedTransferGate immutable gate;
     mapping(address => bool) public liquidityControllers;
 
-    constructor(IUniswapV2Router02 _uniswapV2Router, IERC20 _base, IERC20 _rooted, IERC31337 _elite, IFloorCalculator _calculator, RootedTransferGate _gate) 
+    constructor(IPancakeRouter02 _pancakeRouter, IERC20 _base, IERC20 _rooted, IERC31337 _elite, IFloorCalculator _calculator, RootedTransferGate _gate) 
     {
-        uniswapV2Router = _uniswapV2Router;
+        pancakeRouter = _pancakeRouter;
         base = _base;
         elite = _elite;
         rooted = _rooted;
         calculator = _calculator;
         gate = _gate;
 
-        IUniswapV2Factory _uniswapV2Factory = IUniswapV2Factory(_uniswapV2Router.factory());
-        uniswapV2Factory = _uniswapV2Factory;        
+        IPancakeFactory _pancakeFactory = IPancakeFactory(_pancakeRouter.factory());
+        pancakeFactory = _pancakeFactory;        
         
-        _base.approve(address(_uniswapV2Router), uint256(-1));
-        _rooted.approve(address(_uniswapV2Router), uint256(-1));
-        IERC20 _rootedBaseLP = IERC20(_uniswapV2Factory.getPair(address(_base), address(_rooted)));
-        _rootedBaseLP.approve(address(_uniswapV2Router), uint256(-1));
+        _base.approve(address(_pancakeRouter), uint256(-1));
+        _rooted.approve(address(_pancakeRouter), uint256(-1));
+        IERC20 _rootedBaseLP = IERC20(_pancakeFactory.getPair(address(_base), address(_rooted)));
+        _rootedBaseLP.approve(address(_pancakeRouter), uint256(-1));
         rootedBaseLP = _rootedBaseLP;
-        _elite.approve(address(_uniswapV2Router), uint256(-1));
-        IERC20 _rootedEliteLP = IERC20(_uniswapV2Factory.getPair(address(_elite), address(_rooted)));
-        _rootedEliteLP.approve(address(_uniswapV2Router), uint256(-1));
+        _elite.approve(address(_pancakeRouter), uint256(-1));
+        IERC20 _rootedEliteLP = IERC20(_pancakeFactory.getPair(address(_elite), address(_rooted)));
+        _rootedEliteLP.approve(address(_pancakeRouter), uint256(-1));
         rootedEliteLP = _rootedEliteLP;
     }
 
@@ -82,9 +82,9 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
     {
         uint256 elitePerLpToken = elite.balanceOf(address(rootedEliteLP)).mul(1e18).div(rootedEliteLP.totalSupply());
         uint256 lpToMove = base.balanceOf(address(elite)).mul(1e18).div(elitePerLpToken);
-        (uint256 eliteAmount, uint256 rootedAmount) = uniswapV2Router.removeLiquidity(address(elite), address(rooted), lpToMove, 0, 0, address(this), block.timestamp);
+        (uint256 eliteAmount, uint256 rootedAmount) = pancakeRouter.removeLiquidity(address(elite), address(rooted), lpToMove, 0, 0, address(this), block.timestamp);
         elite.withdrawTokens(eliteAmount);
-        uniswapV2Router.addLiquidity(address(base), address(rooted), eliteAmount, rootedAmount, 0, 0, address(this), block.timestamp);
+        pancakeRouter.addLiquidity(address(base), address(rooted), eliteAmount, rootedAmount, 0, 0, address(this), block.timestamp);
     }
 
     // Removes liquidity, buys from either pool, sets a temporary dump tax
@@ -166,25 +166,25 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
 
     function addLiq(address eliteOrBase, uint256 baseAmount) internal 
     {
-        uniswapV2Router.addLiquidity(address(eliteOrBase), address(rooted), baseAmount, rooted.balanceOf(address(this)), 0, 0, address(this), block.timestamp);
+        pancakeRouter.addLiquidity(address(eliteOrBase), address(rooted), baseAmount, rooted.balanceOf(address(this)), 0, 0, address(this), block.timestamp);
     }
 
     function removeLiq(address eliteOrBase, uint256 tokens) internal returns (uint256)
     {
-        (tokens, ) = uniswapV2Router.removeLiquidity(address(eliteOrBase), address(rooted), tokens, 0, 0, address(this), block.timestamp);
+        (tokens, ) = pancakeRouter.removeLiquidity(address(eliteOrBase), address(rooted), tokens, 0, 0, address(this), block.timestamp);
         return tokens;
     }
 
     function buyRootedToken(address token, uint256 amountToSpend) internal returns (uint256)
     {
-        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amountToSpend, 0, buyPath(token), address(this), block.timestamp);
+        uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(amountToSpend, 0, buyPath(token), address(this), block.timestamp);
         amountToSpend = amounts[1];
         return amountToSpend;
     }
 
     function sellRootedToken(address token, uint256 amountToSpend) internal returns (uint256)
     {
-        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amountToSpend, 0, sellPath(token), address(this), block.timestamp);
+        uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(amountToSpend, 0, sellPath(token), address(this), block.timestamp);
         amountToSpend = amounts[1];
         return amountToSpend;
     }

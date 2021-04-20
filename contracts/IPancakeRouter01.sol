@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
-interface IUniswapV2Router01 {
+interface IPancakeRouter01 {
     function factory() external pure returns (address);
     function WETH() external pure returns (address);
 

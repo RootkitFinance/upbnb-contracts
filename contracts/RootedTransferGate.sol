@@ -17,11 +17,11 @@ It:
 */
 
 import "./Address.sol";
-import "./IUniswapV2Factory.sol";
+import "./IPancakeFactory.sol";
 import "./IERC20.sol";
-import "./IUniswapV2Pair.sol";
+import "./IPancakePair.sol";
 import "./ILiquidityLockedERC20.sol";
-import "./IUniswapV2Router02.sol";
+import "./IPancakeRouter02.sol";
 import "./SafeERC20.sol";
 import "./SafeMath.sol";
 import "./TokensRecoverable.sol";
@@ -33,8 +33,8 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    IUniswapV2Router02 immutable internal uniswapV2Router;
-    IUniswapV2Factory immutable internal uniswapV2Factory;
+    IPancakeRouter02 immutable internal pancakeRouter;
+    IPancakeFactory immutable internal pancakeFactory;
     ILiquidityLockedERC20 immutable internal rootedToken;
 
     bool public unrestricted;
@@ -46,17 +46,17 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     address public override feeSplitter;
     uint16 public feesRate; 
     uint16 public sellFeesRate;
-    IUniswapV2Pair public taxedPool;
+    IPancakePair public taxedPool;
    
     uint16 public dumpTaxStartRate; 
     uint256 public dumpTaxDurationInSeconds;
     uint256 public dumpTaxEndTimestamp;
 
-    constructor(ILiquidityLockedERC20 _rootedToken, IUniswapV2Router02 _uniswapV2Router)
+    constructor(ILiquidityLockedERC20 _rootedToken, IPancakeRouter02 _pancakeRouter)
     {
         rootedToken = _rootedToken;
-        uniswapV2Router = _uniswapV2Router;
-        uniswapV2Factory = IUniswapV2Factory(_uniswapV2Router.factory());
+        pancakeRouter = _pancakeRouter;
+        pancakeFactory = IPancakeFactory(_pancakeRouter.factory());
     }
 
     function setUnrestrictedController(address unrestrictedController, bool allow) public ownerOnly()
@@ -92,7 +92,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         rootedToken.setLiquidityLock(taxedPool, !_unrestricted);
     }    
 
-    function setTaxedPool(IUniswapV2Pair _taxedPool) public ownerOnly()
+    function setTaxedPool(IPancakePair _taxedPool) public ownerOnly()
     {
         taxedPool = _taxedPool;
     }

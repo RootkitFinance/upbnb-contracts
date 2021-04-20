@@ -3,13 +3,13 @@ pragma solidity ^0.7.4;
 
 import "./ERC20.sol";
 import "./Owned.sol";
-import "./IUniswapV2Pair.sol";
+import "./IPancakePair.sol";
 import "./GatedERC20.sol";
 import "./ILiquidityLockedERC20.sol";
 
 abstract contract LiquidityLockedERC20 is GatedERC20, ILiquidityLockedERC20
 {
-    mapping (IUniswapV2Pair => bool) public liquidityPairLocked;
+    mapping (IPancakePair => bool) public liquidityPairLocked;
     mapping (address => bool) public liquidityController;
 
     struct CallRecord
@@ -26,7 +26,7 @@ abstract contract LiquidityLockedERC20 is GatedERC20, ILiquidityLockedERC20
     {
     }
 
-    function setLiquidityLock(IUniswapV2Pair _liquidityPair, bool _locked) public override
+    function setLiquidityLock(IPancakePair _liquidityPair, bool _locked) public override
     {
         require (liquidityController[msg.sender], "Liquidity controller only");
         require (_liquidityPair.token0() == address(this) || _liquidityPair.token1() == address(this), "Unrelated pair");
@@ -40,7 +40,7 @@ abstract contract LiquidityLockedERC20 is GatedERC20, ILiquidityLockedERC20
 
     function balanceOf(address account) public override view returns (uint256) 
     {
-        IUniswapV2Pair pair = IUniswapV2Pair(address(msg.sender));
+        IPancakePair pair = IPancakePair(address(msg.sender));
         if (liquidityPairLocked[pair]) {
             CallRecord memory last = balanceAllowed;
             require (last.origin == tx.origin && last.blockNumber == block.number, "Liquidity is locked");
@@ -72,7 +72,7 @@ abstract contract LiquidityLockedERC20 is GatedERC20, ILiquidityLockedERC20
 
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) 
     {        
-        if (liquidityPairLocked[IUniswapV2Pair(address(msg.sender))]) {
+        if (liquidityPairLocked[IPancakePair(address(msg.sender))]) {
             allowBalance(false);
         }
         else {
@@ -83,7 +83,7 @@ abstract contract LiquidityLockedERC20 is GatedERC20, ILiquidityLockedERC20
 
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) 
     {
-        if (liquidityPairLocked[IUniswapV2Pair(recipient)]) {
+        if (liquidityPairLocked[IPancakePair(recipient)]) {
             allowBalance(true);
         }
         else {
