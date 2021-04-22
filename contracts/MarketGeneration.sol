@@ -7,6 +7,7 @@ import "./TokensRecoverable.sol";
 import "./SafeERC20.sol";
 import "./SafeMath.sol";
 import "./IERC20.sol";
+import "./IWBNB.sol";
 
 contract MarketGeneration is TokensRecoverable, IMarketGeneration
 {
@@ -64,8 +65,8 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     {
         require (block.timestamp >= refundsAllowedUntil, "Refund period is still active");
         isActive = false;
-        if (baseToken.balanceOf(address(this)) == 0) { return; }
-
+        if (address(this).balance == 0) { return; }
+        IWBNB(address(baseToken)).deposit{ value: address(this).balance }();
         baseToken.safeApprove(address(marketDistribution), uint256(-1));
 
         marketDistribution.distribute();
