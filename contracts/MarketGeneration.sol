@@ -24,7 +24,6 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     IERC20 public baseToken;
     IMarketDistribution public marketDistribution;
     uint256 public refundsAllowedUntil;
-    uint256 public hardCap;
 
     constructor(address _devAddress)
     {
@@ -37,11 +36,10 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         _;
     }
 
-    function init(IERC20 _baseToken, uint256 _hardCap) public ownerOnly()
+    function init(IERC20 _baseToken) public ownerOnly()
     {
         require (!isActive && block.timestamp >= refundsAllowedUntil, "Already activated");
         baseToken = _baseToken;
-        hardCap = _hardCap;
     }
 
     function activate(IMarketDistribution _marketDistribution) public ownerOnly()
@@ -119,25 +117,26 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         marketDistribution.claimReferralRewards(msg.sender, refShare);
     }
 
-    function contribute(uint256 amount, address referral) public active() 
+    function contribute(address referral) public payable active() 
     {
-        require (totalContribution < hardCap, "Hard Cap reached");
-
-        baseToken.safeTransferFrom(msg.sender, address(this), amount);
-
         if (referral == address(0) || referral == msg.sender) 
         {
-            referralPoints[devAddress] +=amount;
-            totalReferralPoints += amount;
+            referralPoints[devAddress] += msg.value;
+            totalReferralPoints += msg.value;
         }
         else 
         {
-            referralPoints[msg.sender] += amount;
-            referralPoints[referral] += amount;
-            totalReferralPoints +=(amount + amount);
+            referralPoints[msg.sender] += msg.value;
+            referralPoints[referral] += msg.value;
+            totalReferralPoints +=(msg.value + msg.value);
         }
 
-        contribution[msg.sender] += amount;
-        totalContribution += amount;
+        contribution[msg.sender] += msg.value;
+        totalContribution += msg.value;
+    }
+
+    receive() external payable active()
+    {
+        contribute(address(0));
     }
 }
