@@ -80,11 +80,13 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
     function refund(uint256 amount) private
     {
-        baseToken.safeTransfer(msg.sender, amount);       
+        (bool success,) = msg.sender.call{ value: amount }("");
+        require (success, "Refund transfer failed");  
+          
         totalContribution -= amount;
         contribution[msg.sender] = 0;
 
-       uint256 refPoints = referralPoints[msg.sender];
+        uint256 refPoints = referralPoints[msg.sender];
 
         if (refPoints > 0)
         {
