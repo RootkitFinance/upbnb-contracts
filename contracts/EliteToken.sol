@@ -15,7 +15,7 @@ contract EliteToken is ERC31337
     mapping (address => bool) public burnRateControllers;
     uint16 burnRate;   
 
-    constructor (IERC20 _wrappedToken) ERC31337(_wrappedToken, "eliteNAME", "eSYMB")
+    constructor (IERC20 _wrappedToken) ERC31337(_wrappedToken, "eliteBNB", "eBNB")
     {
     }    
 
