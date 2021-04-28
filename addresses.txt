@@ -1,7 +1,8 @@
 upBNB addresses - BSC main test
 
-pancake router: 0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F
+pancake router: 0x10ed43c718714eb63d5aa57b78b54704e256024e
 pancake factory: 0xBCfCcbde45cE874adCB698cC183deBcF17952812
+OLD pancake router: 0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F
 
 dev: 0x804CC8D469483d202c69752ce0304F71ae14ABdf
 root feed: 0xc27c10ABf2fD6B39Cda4c5478BB2BF1E12919c99
@@ -21,4 +22,9 @@ controller: 0x3E3e69871F5b507BE4a9024EaBFE882fE1DAa2CB
 generation: 0x337B0e8b6C35cEd2952682eb15a51a97373c5b1e
 distribution: 0x1DDDbC37231965897d4131BdbA0ade7069d28AB0
 
+
+TO RELAUNCH
+transfer gate: 
+calculator:
+controller:
 
