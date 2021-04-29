@@ -8,7 +8,7 @@ Ensures 100% of accessible funds are backed at all times
 
 import "./IFloorCalculator.sol";
 import "./SafeMath.sol";
-import "./PancakeLibrary.sol";
+import "./IPancakeRouter02.sol";
 import "./IPancakeFactory.sol";
 import "./TokensRecoverable.sol";
 import "./EnumerableSet.sol";
@@ -19,14 +19,22 @@ contract EliteFloorCalculator is IFloorCalculator, TokensRecoverable
     using EnumerableSet for EnumerableSet.AddressSet;
 
     IERC20 immutable rootedToken;
-    IPancakeFactory immutable pancakeFactory;
+    address immutable rootedElitePair;
+    address immutable rootedBasePair;
+    IPancakeRouter02 immutable internal pancakeRouter;
+    IPancakeFactory immutable internal pancakeFactory;
     EnumerableSet.AddressSet ignoredAddresses;
 
-    constructor(IERC20 _rootedToken, IPancakeFactory _pancakeFactory)
+    constructor(IERC20 _rootedToken, IERC20 _eliteToken, IERC20 _baseToken, IPancakeFactory _pancakeFactory, IPancakeRouter02 _pancakeRouter)
     {
         rootedToken = _rootedToken;
         pancakeFactory = _pancakeFactory;
+        pancakeRouter = _pancakeRouter;
+
+        rootedElitePair = _pancakeFactory.getPair(address(_eliteToken), address(_rootedToken));
+        rootedBasePair = _pancakeFactory.getPair(address(_baseToken), address(_rootedToken));
     }    
+
 
     function setIgnoreAddresses(address ignoredAddress, bool add) public ownerOnly()
     {
@@ -66,53 +74,18 @@ contract EliteFloorCalculator is IFloorCalculator, TokensRecoverable
         return total;
     }
 
-    function calculateExcessInPool(IERC20 token, address pair, uint256 liquidityShare, uint256 rootedTokenTotalSupply, uint256 rootedTokenPoolsLiquidity) internal view returns (uint256)
-    {
-        uint256 freeRootedToken = (rootedTokenTotalSupply.sub(rootedTokenPoolsLiquidity)).mul(liquidityShare).div(1e12);
-
-        uint256 sellAllProceeds = 0;
-        if (freeRootedToken > 0) 
-        {
-            address[] memory path = new address[](2);
-            path[0] = address(rootedToken);
-            path[1] = address(token);
-            uint256[] memory amountsOut = PancakeLibrary.getAmountsOut(address(pancakeFactory), freeRootedToken, path);
-            sellAllProceeds = amountsOut[1];
-        }
-
-        uint256 backingInPool = token.balanceOf(pair);
-        if (backingInPool <= sellAllProceeds) { return 0; }
-        uint256 excessInPool = backingInPool - sellAllProceeds;
-
-        return excessInPool;
-    }
-
-    function calculateExcessInPools(IERC20 baseToken, IERC20 eliteToken) public view returns (uint256)
-    {
-        address rootedElitePair = PancakeLibrary.pairFor(address(pancakeFactory), address(rootedToken), address(eliteToken));
-        address rootedBasePair = PancakeLibrary.pairFor(address(pancakeFactory), address(rootedToken), address(baseToken));   
-        
-        uint256 rootedTokenTotalSupply = rootedToken.totalSupply().sub(ignoredAddressesTotalBalance());
-        uint256 rootedTokenPoolsLiquidity = rootedToken.balanceOf(rootedElitePair).add(rootedToken.balanceOf(rootedBasePair));
-        uint256 baseTokenPoolsLiquidity = eliteToken.balanceOf(rootedElitePair).add(baseToken.balanceOf(rootedBasePair));
-
-        uint256 rootedLiquidityShareInElitePair = rootedToken.balanceOf(rootedElitePair).mul(1e12).div(rootedTokenPoolsLiquidity);
-        uint256 eliteLiquidityShareInElitePair = eliteToken.balanceOf(rootedElitePair).mul(1e12).div(baseTokenPoolsLiquidity);
-        uint256 avgLiquidityShareInElitePair = (rootedLiquidityShareInElitePair.add(eliteLiquidityShareInElitePair)).div(2);
-        uint256 one = 1e12;
-
-        uint256 excessInElitePool = calculateExcessInPool(eliteToken, rootedElitePair, avgLiquidityShareInElitePair, rootedTokenTotalSupply, rootedTokenPoolsLiquidity);
-        uint256 excessInBasePool = calculateExcessInPool(baseToken, rootedBasePair, (one).sub(avgLiquidityShareInElitePair), rootedTokenTotalSupply, rootedTokenPoolsLiquidity);
-        return excessInElitePool.add(excessInBasePool);
-    }
-
     function calculateSubFloor(IERC20 baseToken, IERC20 eliteToken) public override view returns (uint256)
-    {        
-        uint256 excessInPools = calculateExcessInPools(baseToken, eliteToken);
+    {
+        uint256 totalRootedInPairs = rootedToken.balanceOf(rootedElitePair).add(rootedToken.balanceOf(rootedBasePair));
+        uint256 totalBaseAndEliteInPairs = eliteToken.balanceOf(rootedElitePair).add(baseToken.balanceOf(rootedBasePair));
+        uint256 rootedCirculatingSupply = rootedToken.totalSupply().sub(totalRootedInPairs).sub(ignoredAddressesTotalBalance());
+        uint256 amountUntilFloor = pancakeRouter.getAmountOut(rootedCirculatingSupply, totalRootedInPairs, totalBaseAndEliteInPairs);
 
-        uint256 requiredBacking = eliteToken.totalSupply().sub(excessInPools);
-        uint256 currentBacking = baseToken.balanceOf(address(eliteToken));
-        if (requiredBacking >= currentBacking) { return 0; }
-        return currentBacking - requiredBacking;
+        uint256 totalExcessInPools = totalBaseAndEliteInPairs.sub(amountUntilFloor);
+        uint256 previouslySwept = eliteToken.totalSupply().sub(baseToken.balanceOf(address(eliteToken)));
+        
+        if (previouslySwept >= totalExcessInPools) { return 0; }
+
+        return totalExcessInPools.sub(previouslySwept);
     }
 }
