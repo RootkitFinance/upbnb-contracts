@@ -38,6 +38,7 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
         IPancakeFactory _pancakeFactory = IPancakeFactory(_pancakeRouter.factory());
         pancakeFactory = _pancakeFactory;        
         
+        _base.approve(address(_elite), uint256(-1));
         _base.approve(address(_pancakeRouter), uint256(-1));
         _rooted.approve(address(_pancakeRouter), uint256(-1));
         IERC20 _rootedBaseLP = IERC20(_pancakeFactory.getPair(address(_base), address(_rooted)));
@@ -59,32 +60,6 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
     function setLiquidityController(address controlAddress, bool controller) public ownerOnly()
     {
         liquidityControllers[controlAddress] = controller;
-    }
-
-    // Use Base tokens held by this contract to buy from the Base Pool and sell in the Elite Pool
-    function balancePriceBase(uint256 amount) public override liquidityControllerOnly()
-    {
-        amount = buyRootedToken(address(base), amount);
-        amount = sellRootedToken(address(elite), amount);
-        elite.withdrawTokens(amount);
-    }
-
-    // Use Base tokens held by this contract to buy from the Elite Pool and sell in the Base Pool
-    function balancePriceElite(uint256 amount) public override liquidityControllerOnly()
-    {        
-        elite.depositTokens(amount);
-        amount = buyRootedToken(address(elite), amount);
-        amount = sellRootedToken(address(base), amount);
-    }
-
-    // moves available liquidity from Elite pool to Base pool, sweep should be called first
-    function moveAvailableLiquidity() public override liquidityControllerOnly()
-    {
-        uint256 elitePerLpToken = elite.balanceOf(address(rootedEliteLP)).mul(1e18).div(rootedEliteLP.totalSupply());
-        uint256 lpToMove = base.balanceOf(address(elite)).mul(1e18).div(elitePerLpToken);
-        (uint256 eliteAmount, uint256 rootedAmount) = pancakeRouter.removeLiquidity(address(elite), address(rooted), lpToMove, 0, 0, address(this), block.timestamp);
-        elite.withdrawTokens(eliteAmount);
-        pancakeRouter.addLiquidity(address(base), address(rooted), eliteAmount, rootedAmount, 0, 0, address(this), block.timestamp);
     }
 
     // Removes liquidity, buys from either pool, sets a temporary dump tax
