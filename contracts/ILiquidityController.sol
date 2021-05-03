@@ -3,6 +3,8 @@ pragma solidity ^0.7.4;
 
 interface ILiquidityController
 {
+    function balancePriceBase(uint256 amount) external;
+    function balancePriceElite(uint256 amount) external;
     function removeBuyAndTax(uint256 amount, address token, uint16 tax, uint256 time) external;
     function buyAndTax(address token, uint256 amountToSpend, uint16 tax, uint256 time) external;
     function sweepFloor() external;

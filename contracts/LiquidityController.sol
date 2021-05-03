@@ -22,8 +22,8 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
     IERC31337 immutable elite;
     IERC20 immutable rootedEliteLP;
     IERC20 immutable rootedBaseLP;
-    IFloorCalculator immutable calculator;
-    RootedTransferGate immutable gate;
+    IFloorCalculator public calculator;
+    RootedTransferGate public gate;
     mapping(address => bool) public liquidityControllers;
 
     constructor(IPancakeRouter02 _pancakeRouter, IERC20 _base, IERC20 _rooted, IERC31337 _elite, IFloorCalculator _calculator, RootedTransferGate _gate) 
@@ -62,6 +62,12 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
         liquidityControllers[controlAddress] = controller;
     }
 
+    function setCalculatorAndGate(IFloorCalculator _calculator, RootedTransferGate _gate) public ownerOnly()
+    {
+        calculator = _calculator;
+        gate = _gate;
+    }
+
     // Removes liquidity, buys from either pool, sets a temporary dump tax
     function removeBuyAndTax(uint256 amount, address token, uint16 tax, uint256 time) public override liquidityControllerOnly()
     {
@@ -70,6 +76,22 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
         buyRootedToken(token, amount);
         gate.setDumpTax(tax, time);
         gate.setUnrestricted(false);
+    }
+
+    // Use Base tokens held by this contract to buy from the Base Pool and sell in the Elite Pool
+    function balancePriceBase(uint256 amount) public override liquidityControllerOnly()
+    {
+        amount = buyRootedToken(address(base), amount);
+        amount = sellRootedToken(address(elite), amount);
+        elite.withdrawTokens(amount);
+    }
+
+    // Use Base tokens held by this contract to buy from the Elite Pool and sell in the Base Pool
+    function balancePriceElite(uint256 amount) public override liquidityControllerOnly()
+    {        
+        elite.depositTokens(amount);
+        amount = buyRootedToken(address(elite), amount);
+        amount = sellRootedToken(address(base), amount);
     }
 
     // Uses value in the controller to buy

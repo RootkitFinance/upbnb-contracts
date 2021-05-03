@@ -42,11 +42,11 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     mapping (address => bool) public feeControllers;
     mapping (address => bool) public freeParticipantControllers;
     mapping (address => bool) public freeParticipant;
+    mapping (address => uint16) public poolsTaxRates;
 
     address public override feeSplitter;
-    uint16 public feesRate; 
-    uint16 public sellFeesRate;
-    IPancakePair public taxedPool;
+    uint16 public feesRate;
+    IPancakePair public mainPool;
    
     uint16 public dumpTaxStartRate; 
     uint256 public dumpTaxDurationInSeconds;
@@ -89,18 +89,24 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     {
         require (unrestrictedControllers[msg.sender], "Not an unrestricted controller");
         unrestricted = _unrestricted;
-        rootedToken.setLiquidityLock(taxedPool, !_unrestricted);
+        rootedToken.setLiquidityLock(mainPool, !_unrestricted);
     }    
 
-    function setTaxedPool(IPancakePair _taxedPool) public ownerOnly()
+    function setMainPool(IPancakePair _mainPool) public ownerOnly()
     {
-        taxedPool = _taxedPool;
+        mainPool = _mainPool;
+    }
+
+     function setPoolTaxRate(address pool, uint16 taxRate) public ownerOnly()
+    {
+        require (taxRate <= 10000, "Fee rate must be less than or equal to 100%");
+        poolsTaxRates[pool] = taxRate;        
     }
 
     function setDumpTax(uint16 startTaxRate, uint256 durationInSeconds) public
     {
         require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (startTaxRate <= 2500, "Dump tax rate must be less than or equal to 25%");
+        require (startTaxRate <= 10000, "Dump tax rate must be less than or equal to 100%");
 
         dumpTaxStartRate = startTaxRate;
         dumpTaxDurationInSeconds = durationInSeconds;
@@ -120,16 +126,8 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setFees(uint16 _feesRate) public
     {
         require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (_feesRate <= 1000, "Fee rate must be less than or equal to 10%");
+        require (_feesRate <= 10000, "Fee rate must be less than or equal to 100%");
         feesRate = _feesRate;
-    }
-    
-    function setSellFees(uint16 _sellFeesRate) public
-    {
-        require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (_sellFeesRate <= 2500, "Sell fee rate must be less than or equal to 25%");
-        
-        sellFeesRate = _sellFeesRate;
     }
 
     function handleTransfer(address, address from, address to, uint256 amount) public virtual override returns (uint256)
@@ -139,9 +137,12 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
             return 0;
         }
 
-        if (to == address(taxedPool)) 
+        uint16 poolTaxRate = poolsTaxRates[to];
+
+        if (poolTaxRate > feesRate) 
         {
-            return amount * sellFeesRate / 10000 + amount * getDumpTax() / 10000;
+            uint256 totalTax = getDumpTax() + poolTaxRate;
+            return totalTax >= 10000 ? amount : amount * totalTax / 10000;
         }
 
         return amount * feesRate / 10000;
