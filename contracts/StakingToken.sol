@@ -4,8 +4,9 @@ pragma solidity ^0.7.4;
 import "./SafeMath.sol";
 import "./IERC20.sol";
 import "./ERC20.sol";
+import "./TokensRecoverable.sol";
 
-contract Staking is ERC20("upBNB Staking", "xUpBNB")
+contract StakingToken is ERC20("upBNB Staking", "xUpBNB"), TokensRecoverable
 {
     using SafeMath for uint256;
     IERC20 public immutable rooted;
@@ -42,5 +43,10 @@ contract Staking is ERC20("upBNB Staking", "xUpBNB")
 
         _burn(msg.sender, share);
         rooted.transfer(msg.sender, unstakeAmount);
+    }
+
+    function canRecoverTokens(IERC20 token) internal virtual view returns (bool) 
+    { 
+        return address(token) != address(this) && address(token) != address(rooted); 
     }
 }
