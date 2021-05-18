@@ -45,7 +45,7 @@ contract StakingToken is ERC20("upBNB Staking", "xUpBNB"), TokensRecoverable
         rooted.transfer(msg.sender, unstakeAmount);
     }
 
-    function canRecoverTokens(IERC20 token) internal virtual view returns (bool) 
+    function canRecoverTokens(IERC20 token) internal override view returns (bool) 
     { 
         return address(token) != address(this) && address(token) != address(rooted); 
     }
