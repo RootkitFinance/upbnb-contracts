@@ -75,7 +75,7 @@ contract FeeSplitter is TokensRecoverable
         if (burnRates[token] > 0)
         {
             uint256 burnAmount = burnRates[token] * balance / 10000;
-            token.burn(address(this), burnAmount);
+            token.burn(burnAmount);
         }
 
         address[] memory collectors = feeCollectors[token];

@@ -53,8 +53,8 @@ abstract contract GatedERC20 is ERC20, TokensRecoverable, IGatedERC20
         emit Transfer(sender, recipient, remaining);
     }
 
-    function burn(address account, uint256 amount) public override
+    function burn(uint256 amount) public override
     {
-        _burn(account, amount);
+        _burn(msg.sender, amount);
     }
 }

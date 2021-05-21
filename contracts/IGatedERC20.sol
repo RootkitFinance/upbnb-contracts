@@ -9,5 +9,5 @@ interface IGatedERC20 is IERC20
     function transferGate() external view returns (ITransferGate);
 
     function setTransferGate(ITransferGate _transferGate) external;
-    function burn(address account, uint256 amount) external;
+    function burn(uint256 amount) external;
 }
