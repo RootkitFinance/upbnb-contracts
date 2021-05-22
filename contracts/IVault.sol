@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
-interface ILiquidityController
+interface IVault
 {
     function balancePriceBase(uint256 amount) external;
     function balancePriceElite(uint256 amount) external;

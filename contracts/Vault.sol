@@ -8,10 +8,10 @@ import "./IERC20.sol";
 import "./RootedTransferGate.sol";
 import "./IPancakeFactory.sol";
 import "./SafeMath.sol";
-import "./ILiquidityController.sol";
+import "./IVault.sol";
 import "./IFloorCalculator.sol";
 
-contract LiquidityController is TokensRecoverable, ILiquidityController
+contract Vault is TokensRecoverable, IVault
 {
     using SafeMath for uint256;
 
@@ -24,7 +24,7 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
     IERC20 immutable rootedBaseLP;
     IFloorCalculator public calculator;
     RootedTransferGate public gate;
-    mapping(address => bool) public liquidityControllers;
+    mapping(address => bool) public seniorVaultManager;
 
     constructor(IPancakeRouter02 _pancakeRouter, IERC20 _base, IERC20 _rooted, IERC31337 _elite, IFloorCalculator _calculator, RootedTransferGate _gate) 
     {
@@ -52,14 +52,14 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
 
     modifier liquidityControllerOnly()
     {
-        require(liquidityControllers[msg.sender], "Not a Liquidity Controller");
+        require(seniorVaultManager[msg.sender], "Not a Liquidity Controller");
         _;
     }
 
     // Owner function to enable other contracts or addresses to use the Liquidity Controller
     function setLiquidityController(address controlAddress, bool controller) public ownerOnly()
     {
-        liquidityControllers[controlAddress] = controller;
+        seniorVaultManager[controlAddress] = controller;
     }
 
     function setCalculatorAndGate(IFloorCalculator _calculator, RootedTransferGate _gate) public ownerOnly()
