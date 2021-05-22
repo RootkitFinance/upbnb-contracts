@@ -50,9 +50,9 @@ contract Vault is TokensRecoverable, IVault
         rootedEliteLP = _rootedEliteLP;
     }
 
-    modifier liquidityControllerOnly()
+    modifier seniorVaultManagerOnly()
     {
-        require(seniorVaultManager[msg.sender], "Not a Liquidity Controller");
+        require(seniorVaultManager[msg.sender], "Not a Senior Vault Manager");
         _;
     }
 
@@ -69,7 +69,7 @@ contract Vault is TokensRecoverable, IVault
     }
 
     // Removes liquidity, buys from either pool, sets a temporary dump tax
-    function removeBuyAndTax(uint256 amount, address token, uint16 tax, uint256 time) public override liquidityControllerOnly()
+    function removeBuyAndTax(uint256 amount, address token, uint16 tax, uint256 time) public override seniorVaultManagerOnly()
     {
         gate.setUnrestricted(true);
         amount = removeLiq(token, amount);
@@ -79,7 +79,7 @@ contract Vault is TokensRecoverable, IVault
     }
 
     // Use Base tokens held by this contract to buy from the Base Pool and sell in the Elite Pool
-    function balancePriceBase(uint256 amount) public override liquidityControllerOnly()
+    function balancePriceBase(uint256 amount) public override seniorVaultManagerOnly()
     {
         amount = buyRootedToken(address(base), amount);
         amount = sellRootedToken(address(elite), amount);
@@ -87,7 +87,7 @@ contract Vault is TokensRecoverable, IVault
     }
 
     // Use Base tokens held by this contract to buy from the Elite Pool and sell in the Base Pool
-    function balancePriceElite(uint256 amount) public override liquidityControllerOnly()
+    function balancePriceElite(uint256 amount) public override seniorVaultManagerOnly()
     {        
         elite.depositTokens(amount);
         amount = buyRootedToken(address(elite), amount);
@@ -95,20 +95,20 @@ contract Vault is TokensRecoverable, IVault
     }
 
     // Uses value in the controller to buy
-    function buyAndTax(address token, uint256 amountToSpend, uint16 tax, uint256 time) public override liquidityControllerOnly()
+    function buyAndTax(address token, uint256 amountToSpend, uint16 tax, uint256 time) public override seniorVaultManagerOnly()
     {
         buyRootedToken(token, amountToSpend);
         gate.setDumpTax(tax, time);
     }
 
     // Sweeps the Base token under the floor to this address
-    function sweepFloor() public override liquidityControllerOnly()
+    function sweepFloor() public override seniorVaultManagerOnly()
     {
         elite.sweepFloor(address(this));
     }
 
     // Move liquidity from Elite pool --->> Base pool
-    function zapEliteToBase(uint256 liquidity) public override liquidityControllerOnly() 
+    function zapEliteToBase(uint256 liquidity) public override seniorVaultManagerOnly() 
     {       
         gate.setUnrestricted(true);
         liquidity = removeLiq(address(elite), liquidity);
@@ -118,7 +118,7 @@ contract Vault is TokensRecoverable, IVault
     }
 
     // Move liquidity from Base pool --->> Elite pool
-    function zapBaseToElite(uint256 liquidity) public override liquidityControllerOnly() 
+    function zapBaseToElite(uint256 liquidity) public override seniorVaultManagerOnly() 
     {
         gate.setUnrestricted(true);
         liquidity = removeLiq(address(base), liquidity);
@@ -127,36 +127,36 @@ contract Vault is TokensRecoverable, IVault
         gate.setUnrestricted(false);
     }
 
-    function wrapToElite(uint256 baseAmount) public override liquidityControllerOnly() 
+    function wrapToElite(uint256 baseAmount) public override seniorVaultManagerOnly() 
     {
         elite.depositTokens(baseAmount);
     }
 
-    function unwrapElite(uint256 eliteAmount) public override liquidityControllerOnly() 
+    function unwrapElite(uint256 eliteAmount) public override seniorVaultManagerOnly() 
     {
         elite.withdrawTokens(eliteAmount);
     }
 
-    function addLiquidity(address eliteOrBase, uint256 baseAmount) public override liquidityControllerOnly() 
+    function addLiquidity(address eliteOrBase, uint256 baseAmount) public override seniorVaultManagerOnly() 
     {
         gate.setUnrestricted(true);
         addLiq(eliteOrBase, baseAmount);
         gate.setUnrestricted(false);
     }
 
-    function removeLiquidity(address eliteOrBase, uint256 tokens) public override liquidityControllerOnly()
+    function removeLiquidity(address eliteOrBase, uint256 tokens) public override seniorVaultManagerOnly()
     {
         gate.setUnrestricted(true);
         removeLiq(eliteOrBase, tokens);
         gate.setUnrestricted(false);
     }
 
-    function buyRooted(address token, uint256 amountToSpend) public override liquidityControllerOnly()
+    function buyRooted(address token, uint256 amountToSpend) public override seniorVaultManagerOnly()
     {
         buyRootedToken(token, amountToSpend);
     }
 
-    function sellRooted(address token, uint256 amountToSpend) public override liquidityControllerOnly()
+    function sellRooted(address token, uint256 amountToSpend) public override seniorVaultManagerOnly()
     {
         sellRootedToken(token, amountToSpend);
     }
