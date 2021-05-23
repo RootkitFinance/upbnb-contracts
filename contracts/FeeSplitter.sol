@@ -8,6 +8,7 @@ import "./SafeMath.sol";
 import "./SafeERC20.sol";
 import "./Address.sol";
 import "./TokensRecoverable.sol";
+import './IPancakeRouter02.sol';
 
 contract FeeSplitter is TokensRecoverable
 {
@@ -20,16 +21,19 @@ contract FeeSplitter is TokensRecoverable
     address public devAddress;
     address public immutable deployerAddress;
     address public rootFeederAddress;
+    IPancakeRouter02 public router;
 
     mapping (IGatedERC20 => address[]) public feeCollectors;
     mapping (IGatedERC20 => uint256[]) public feeRates;
     mapping (IGatedERC20 => uint256) public burnRates;
+    mapping (IGatedERC20 => bool[]) public sells;
 
-    constructor(address _devAddress, address _rootFeederAddress)
+    constructor(address _devAddress, address _rootFeederAddress, IPancakeRouter02 _router)
     {
         deployerAddress = msg.sender;
         devAddress = _devAddress;
         rootFeederAddress = _rootFeederAddress;
+        router = _router;
     }
 
     function setDevAddress(address _devAddress) public
@@ -43,9 +47,9 @@ contract FeeSplitter is TokensRecoverable
         rootFeederAddress = _rootFeederAddress;
     }
 
-    function setFees(IGatedERC20 token, uint256 burnRate, address[] memory collectors, uint256[] memory rates) public ownerOnly() // 100% = 10000
+    function setFees(IGatedERC20 token, uint256 burnRate, address[] memory collectors, uint256[] memory rates, bool[] memory isSell) public ownerOnly() // 100% = 10000
     {
-        require (collectors.length == rates.length && collectors.length > 1, "Fee Collectors and Rates must be the same size and contain at least 2 elements");
+        require (collectors.length == rates.length && collectors.length == isSell.length && collectors.length > 1, "Fee Collectors, Rates and isSell must be the same size and contain at least 2 elements");
         require (collectors[0] == devAddress && collectors[1] == rootFeederAddress, "First address must be dev address, second address must be rootFeeder address");
         require (rates[0] >= devRateMin && rates[1] >= rootRateMin, "First rate must be greater or equal to devRateMin and second rate must be greater or equal to rootRateMin");
         
@@ -56,15 +60,11 @@ contract FeeSplitter is TokensRecoverable
         }
 
         require (totalRate == 10000, "Total fee rate must be 100%");
-        
-        if (token.balanceOf(address(this)) > 0)
-        {
-            payFees(token);
-        }
 
         feeCollectors[token] = collectors;
         feeRates[token] = rates;
         burnRates[token] = burnRate;
+        sells[token] = isSell;
     }
 
     function payFees(IGatedERC20 token) public
@@ -80,6 +80,7 @@ contract FeeSplitter is TokensRecoverable
 
         address[] memory collectors = feeCollectors[token];
         uint256[] memory rates = feeRates[token];
+        bool[] memory isSell = sells[token];
 
         for (uint256 i = 0; i < collectors.length; i++)
         {
@@ -89,7 +90,18 @@ contract FeeSplitter is TokensRecoverable
             if (rate > 0)
             {
                 uint256 feeAmount = rate * balance / 10000;
-                token.transfer(collector, feeAmount);
+
+                if (isSell[i])
+                {
+                    address[] memory path = new address[](2);
+                    path[0] = address(token);
+                    path[1] = router.WETH();
+                    router.swapExactTokensForETHSupportingFeeOnTransferTokens(feeAmount, 0, path, collector, block.timestamp);
+                }
+                else
+                {
+                    token.transfer(collector, feeAmount);
+                }                
             }
         }
     }
