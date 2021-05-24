@@ -33,7 +33,7 @@ contract FeeSplitter is TokensRecoverable
         deployerAddress = msg.sender;
         devAddress = _devAddress;
         rootFeederAddress = _rootFeederAddress;
-        router = _router;
+        router = _router;      
     }
 
     function setDevAddress(address _devAddress) public
@@ -65,6 +65,7 @@ contract FeeSplitter is TokensRecoverable
         feeRates[token] = rates;
         burnRates[token] = burnRate;
         sells[token] = isSell;
+        token.approve(address(router), uint256(-1));
     }
 
     function payFees(IGatedERC20 token) public

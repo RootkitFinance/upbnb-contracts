@@ -16,6 +16,7 @@ exports.createUniswap = async function(owner) {
         factory,
         router,
         library,
+        weth,
         pairFor: address => new ethers.Contract(address, PancakePairJson.abi, owner)
     };
 }

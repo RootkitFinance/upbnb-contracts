@@ -1,21 +1,23 @@
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
 const { utils } = require("ethers");
+const { createUniswap } = require("./helpers");
 
 describe("FeeSplitter", function() {
-    let rooted, feeSplitter, owner, dev, rootFeeder, feeCollector;
+    let rooted, feeSplitter, owner, dev, rootFeeder, feeCollector, uniswap;
     const burnRate = 2000; // 20%
     const devRate = 2500; // 25%
     const rootFeederRate = 5500; // 55%
 
     beforeEach(async function() {
         [owner, dev, rootFeeder, feeCollector] = await ethers.getSigners();
-
-        const feeSplitterFactory = await ethers.getContractFactory("FeeSplitter");
-        feeSplitter = await feeSplitterFactory.connect(owner).deploy(dev.address, rootFeeder.address);
-
         const rootedFactory = await ethers.getContractFactory("RootedToken");
         rooted = await rootedFactory.connect(owner).deploy();
+        const feeSplitterFactory = await ethers.getContractFactory("FeeSplitter");
+        uniswap = await createUniswap(owner);
+        await uniswap.factory.createPair(uniswap.weth.address, rooted.address);
+        feeSplitter = await feeSplitterFactory.connect(owner).deploy(dev.address, rootFeeder.address, uniswap.router.address);
+        
         await rooted.connect(owner).setMinter(owner.address);
         await rooted.connect(owner).mint(utils.parseEther("1000"));
     })
@@ -48,7 +50,8 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [dev.address, rootFeeder.address], 
-            [devRate, rootFeederRate]);
+            [devRate, rootFeederRate],
+            [false, false]);
         
         expect(await feeSplitter.burnRates(rooted.address)).to.equal(burnRate);
         expect(await feeSplitter.feeCollectors(rooted.address, 0)).to.equal(dev.address);
@@ -62,8 +65,9 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [dev.address], 
-            [devRate]))
-        .to.be.revertedWith("Fee Collectors and Rates must be the same size and contain at least 2 elements");
+            [devRate],
+            [false]))
+        .to.be.revertedWith("Fee Collectors, Rates and isSell must be the same size and contain at least 2 elements");
     })
 
     it("reverts setFees because Fee Collectors and Rates are not the same size", async function() {                
@@ -71,13 +75,14 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [dev.address, rootFeeder.address], 
-            [devRate]))
-        .to.be.revertedWith("Fee Collectors and Rates must be the same size and contain at least 2 elements");
+            [devRate],
+            [false]))
+        .to.be.revertedWith("Fee Collectors, Rates and isSell must be the same size and contain at least 2 elements");
     })  
 
     it("reverts setFees because Fee Collectors and Rates are empty", async function() {                
-        await expect(feeSplitter.setFees(rooted.address, burnRate, [], []))
-        .to.be.revertedWith("Fee Collectors and Rates must be the same size and contain at least 2 elements");
+        await expect(feeSplitter.setFees(rooted.address, burnRate, [], [], []))
+        .to.be.revertedWith("Fee Collectors, Rates and isSell must be the same size and contain at least 2 elements");
     })
 
     it("reverts setFees because first address is not a dev address", async function() {                
@@ -85,7 +90,8 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [owner.address, rootFeeder.address], 
-            [rootFeederRate, devRate]))
+            [rootFeederRate, devRate],
+            [false, false]))
         .to.be.revertedWith("First address must be dev address, second address must be rootFeeder address");
     })
 
@@ -94,7 +100,8 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [dev.address, owner.address], 
-            [devRate, rootFeederRate]))
+            [devRate, rootFeederRate],
+            [false, false]))
         .to.be.revertedWith("First address must be dev address, second address must be rootFeeder address");
     })
 
@@ -103,7 +110,8 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [dev.address, rootFeeder.address], 
-            ["999", rootFeederRate]))
+            ["999", rootFeederRate],
+            [false, false]))
         .to.be.revertedWith("First rate must be greater or equal to devRateMin and second rate must be greater or equal to rootRateMin");
     })
 
@@ -112,7 +120,8 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [dev.address, rootFeeder.address], 
-            [devRate, "999"]))
+            [devRate, "999"],
+            [false, false]))
         .to.be.revertedWith("First rate must be greater or equal to devRateMin and second rate must be greater or equal to rootRateMin");
     })
 
@@ -121,7 +130,8 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [dev.address, rootFeeder.address], 
-            [devRate, "2000"]))
+            [devRate, "2000"],
+            [false, false]))
         .to.be.revertedWith("Total fee rate must be 100%");
     })
 
@@ -129,29 +139,13 @@ describe("FeeSplitter", function() {
         await expect(feeSplitter.payFees(rooted.address)).to.be.revertedWith("Nothing to pay");
     })
 
-    it("pays fees and burns when setFees is called if balance > 0", async function() {                 
-        await feeSplitter.setFees(
-            rooted.address, 
-            burnRate, 
-            [dev.address, rootFeeder.address], 
-            [devRate, rootFeederRate]);
-        
-        await rooted.connect(owner).transfer(feeSplitter.address, utils.parseEther("100"));
-
-        await feeSplitter.setFees(rooted.address, 0, [dev.address, rootFeeder.address, owner.address], [2000, 2000, 6000]);
-
-        expect(await rooted.balanceOf(feeSplitter.address)).to.equal(utils.parseEther("0"));
-        expect(await rooted.balanceOf(dev.address)).to.be.equal(utils.parseEther("25"));
-        expect(await rooted.balanceOf(rootFeeder.address)).to.be.equal(utils.parseEther("55"));
-    })
-
-
     it("pays fees and burns as expected", async function() {                 
         await feeSplitter.setFees(
             rooted.address, 
             burnRate, 
             [dev.address, rootFeeder.address], 
-            [devRate, rootFeederRate]);
+            [devRate, rootFeederRate],
+            [false, false]);
         
         await rooted.connect(owner).transfer(feeSplitter.address, utils.parseEther("100"));
 
@@ -160,6 +154,23 @@ describe("FeeSplitter", function() {
         expect(await rooted.balanceOf(feeSplitter.address)).to.equal(utils.parseEther("0"));
         expect(await rooted.balanceOf(dev.address)).to.be.equal(utils.parseEther("25"));
         expect(await rooted.balanceOf(rootFeeder.address)).to.be.equal(utils.parseEther("55"));
+    })
+
+    it("pays fees, swaps and burns as expected", async function() {                 
+        await feeSplitter.setFees(
+            rooted.address, 
+            burnRate, 
+            [dev.address, rootFeeder.address], 
+            [devRate, rootFeederRate],
+            [true, true]);
+        
+        await rooted.connect(owner).transfer(feeSplitter.address, utils.parseEther("100"));
+
+        await feeSplitter.payFees(rooted.address);
+
+        expect(await rooted.balanceOf(feeSplitter.address)).to.equal(utils.parseEther("0"));
+        expect(await rooted.balanceOf(dev.address)).to.be.equal(utils.parseEther("0"));
+        expect(await rooted.balanceOf(rootFeeder.address)).to.be.equal(utils.parseEther("0"));
     })
 
     it("can recover token if fee collectors are not set", async function() {       
@@ -176,7 +187,8 @@ describe("FeeSplitter", function() {
             rooted.address, 
             burnRate, 
             [dev.address, rootFeeder.address], 
-            [devRate, rootFeederRate]);
+            [devRate, rootFeederRate],
+            [false, false]);
 
         await expect(feeSplitter.recoverTokens(rooted.address)).to.be.revertedWith();
         expect(await rooted.balanceOf(feeSplitter.address)).to.equal(utils.parseEther("100"));
