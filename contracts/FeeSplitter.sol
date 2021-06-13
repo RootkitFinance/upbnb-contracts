@@ -15,24 +15,29 @@ contract FeeSplitter is TokensRecoverable
     using SafeERC20 for IERC20;
     using Address for address;
     
-    uint256 devRateMin = 1000;  
-    uint256 rootRateMin = 1000; 
-    address public devAddress;
-    address public immutable deployerAddress;
+    address public devAddress;    
     address public rootFeederAddress;
-    IPancakeRouter02 public router;
-
-    mapping (IGatedERC20 => address[]) public feeCollectors;
-    mapping (IGatedERC20 => uint256[]) public feeRates;
+    address public immutable deployerAddress;
+    IPancakeRouter02 public immutable router;
+    IERC20 public immutable chainToken;
+   
     mapping (IGatedERC20 => uint256) public burnRates;
-    mapping (IGatedERC20 => bool[]) public sells;
+    mapping (IGatedERC20 => uint256) public sellRates;
+    mapping (IGatedERC20 => uint256) public keepRates;
+
+    mapping (IGatedERC20 => address[]) public chainTokenFeeCollectors;
+    mapping (IGatedERC20 => uint256[]) public chainTokenFeeRates;
+
+    mapping (IGatedERC20 => address[]) public rootedTokenFeeCollectors;
+    mapping (IGatedERC20 => uint256[]) public rootedTokenFeeRates;
 
     constructor(address _devAddress, address _rootFeederAddress, IPancakeRouter02 _router)
     {
         deployerAddress = msg.sender;
         devAddress = _devAddress;
         rootFeederAddress = _rootFeederAddress;
-        router = _router;      
+        router = _router;
+        chainToken = IERC20(_router.WETH());   
     }
 
     function setDevAddress(address _devAddress) public
@@ -46,13 +51,34 @@ contract FeeSplitter is TokensRecoverable
         rootFeederAddress = _rootFeederAddress;
     }
 
-    function setFees(IGatedERC20 token, uint256 burnRate, address[] memory collectors, uint256[] memory rates, bool[] memory isSell) public ownerOnly() // 100% = 10000
+    function setFees(IGatedERC20 token, uint256 burnRate, uint256 sellRate, uint256 keepRate) public ownerOnly() // 100% = 10000
     {
-        require (collectors.length == rates.length && collectors.length == isSell.length && collectors.length > 1, "Fee Collectors, Rates and isSell must be the same size and contain at least 2 elements");
+        require (burnRate + sellRate + keepRate == 10000, "Total fee rate must be 100%");
+        token.approve(address(router), uint256(-1));
+    }
+
+    function setChainTokenFeeCollectors(IGatedERC20 token, address[] memory collectors, uint256[] memory rates) public ownerOnly() // 100% = 10000
+    {
+        require (collectors.length == rates.length && collectors.length > 1, "Fee Collectors and Rates must be the same size and contain at least 2 elements");
         require (collectors[0] == devAddress && collectors[1] == rootFeederAddress, "First address must be dev address, second address must be rootFeeder address");
-        require (rates[0] >= devRateMin && rates[1] >= rootRateMin, "First rate must be greater or equal to devRateMin and second rate must be greater or equal to rootRateMin");
         
-        uint256 totalRate = burnRate;
+        uint256 totalRate = 0;
+        for (uint256 i = 0; i < rates.length; i++)
+        {
+            totalRate = totalRate + rates[i];
+        }
+        
+        require (totalRate == 10000, "Total fee rate must be 100%");
+
+        chainTokenFeeCollectors[token] = collectors;
+        chainTokenFeeRates[token] = rates;
+    }
+
+    function setRootedTokenFeeCollectors(IGatedERC20 token, address[] memory collectors, uint256[] memory rates) public ownerOnly() // 100% = 10000
+    {
+        require (collectors.length == rates.length && collectors.length > 1, "Fee Collectors and Rates must be the same size and contain at least 2 elements");
+        
+        uint256 totalRate = 0;
         for (uint256 i = 0; i < rates.length; i++)
         {
             totalRate = totalRate + rates[i];
@@ -60,11 +86,8 @@ contract FeeSplitter is TokensRecoverable
 
         require (totalRate == 10000, "Total fee rate must be 100%");
 
-        feeCollectors[token] = collectors;
-        feeRates[token] = rates;
-        burnRates[token] = burnRate;
-        sells[token] = isSell;
-        token.approve(address(router), uint256(-1));
+        rootedTokenFeeCollectors[token] = collectors;
+        rootedTokenFeeRates[token] = rates;
     }
 
     function payFees(IGatedERC20 token) public
@@ -78,10 +101,32 @@ contract FeeSplitter is TokensRecoverable
             token.burn(burnAmount);
         }
 
-        address[] memory collectors = feeCollectors[token];
-        uint256[] memory rates = feeRates[token];
-        bool[] memory isSell = sells[token];
+        if (sellRates[token] > 0)
+        {
+            uint256 sellAmount = sellRates[token] * balance / 10000;
+            
+            address[] memory path = new address[](2);
+            path[0] = address(token);
+            path[1] = address(chainToken);
+            uint256[] memory amounts = router.swapExactTokensForTokens(sellAmount, 0, path, address(this), block.timestamp);
+            uint256 chainTokenAmount = amounts[1];
 
+            address[] memory collectors = chainTokenFeeCollectors[token];
+            uint256[] memory rates = chainTokenFeeRates[token];
+            distribute(chainToken, amounts[1], collectors, rates);
+        }
+
+        if (keepRates[token] > 0)
+        {
+            uint256 keepAmount = keepRates[token] * balance / 10000;
+            address[] memory collectors = rootedTokenFeeCollectors[token];
+            uint256[] memory rates = rootedTokenFeeRates[token];
+            distribute(token, keepAmount, collectors, rates);
+        }
+    }
+    
+    function distribute(IERC20 token, uint256 amount, address[] memory collectors, uint256[] memory rates) private
+    {
         for (uint256 i = 0; i < collectors.length; i++)
         {
             address collector = collectors[i];
@@ -89,26 +134,9 @@ contract FeeSplitter is TokensRecoverable
 
             if (rate > 0)
             {
-                uint256 feeAmount = rate * balance / 10000;
-
-                if (isSell[i])
-                {
-                    address[] memory path = new address[](2);
-                    path[0] = address(token);
-                    path[1] = router.WETH();
-                    router.swapExactTokensForETHSupportingFeeOnTransferTokens(feeAmount, 0, path, collector, block.timestamp);
-                }
-                else
-                {
-                    token.transfer(collector, feeAmount);
-                }                
+                uint256 feeAmount = rate * amount / 10000;
+                token.transfer(collector, feeAmount);
             }
         }
-    }
-
-    function canRecoverTokens(IERC20 token) internal override view returns (bool) 
-    { 
-        address[] memory collectors = feeCollectors[IGatedERC20(address(token))];
-        return address(token) != address(this) && collectors.length == 0; 
     }
 }
