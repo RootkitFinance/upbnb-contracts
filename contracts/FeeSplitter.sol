@@ -54,12 +54,17 @@ contract FeeSplitter is TokensRecoverable
     function setFees(IGatedERC20 token, uint256 burnRate, uint256 sellRate, uint256 keepRate) public ownerOnly() // 100% = 10000
     {
         require (burnRate + sellRate + keepRate == 10000, "Total fee rate must be 100%");
+        
+        burnRates[token] = burnRate;
+        sellRates[token] = sellRate;
+        keepRates[token] = keepRate;
+        
         token.approve(address(router), uint256(-1));
     }
 
     function setChainTokenFeeCollectors(IGatedERC20 token, address[] memory collectors, uint256[] memory rates) public ownerOnly() // 100% = 10000
     {
-        require (collectors.length == rates.length && collectors.length > 1, "Fee Collectors and Rates must be the same size and contain at least 2 elements");
+        require (collectors.length == rates.length, "Fee Collectors and Rates must be the same size");
         require (collectors[0] == devAddress && collectors[1] == rootFeederAddress, "First address must be dev address, second address must be rootFeeder address");
         
         uint256 totalRate = 0;
@@ -76,7 +81,7 @@ contract FeeSplitter is TokensRecoverable
 
     function setRootedTokenFeeCollectors(IGatedERC20 token, address[] memory collectors, uint256[] memory rates) public ownerOnly() // 100% = 10000
     {
-        require (collectors.length == rates.length && collectors.length > 1, "Fee Collectors and Rates must be the same size and contain at least 2 elements");
+        require (collectors.length == rates.length, "Fee Collectors and Rates must be the same size");
         
         uint256 totalRate = 0;
         for (uint256 i = 0; i < rates.length; i++)
@@ -109,7 +114,6 @@ contract FeeSplitter is TokensRecoverable
             path[0] = address(token);
             path[1] = address(chainToken);
             uint256[] memory amounts = router.swapExactTokensForTokens(sellAmount, 0, path, address(this), block.timestamp);
-            uint256 chainTokenAmount = amounts[1];
 
             address[] memory collectors = chainTokenFeeCollectors[token];
             uint256[] memory rates = chainTokenFeeRates[token];
