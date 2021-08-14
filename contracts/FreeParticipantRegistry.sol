@@ -5,17 +5,28 @@ import "./Owned.sol";
 
 contract FreeParticipantRegistry is Owned
 {
+    address transferGate;
     mapping (address => bool) public freeParticipantControllers;
     mapping (address => bool) public freeParticipant;
 
-    function setFreeParticipantController(address freeParticipantController, bool allow) public ownerOnly()
+    modifier transferGateOnly()
+    {
+        require (msg.sender == transferGate, "Transfer Gate only");
+        _;
+    }
+
+    function setTransferGate(address _transferGate) public ownerOnly()
+    {
+        transferGate = _transferGate;
+    }
+
+    function setFreeParticipantController(address freeParticipantController, bool allow) public transferGateOnly()
     {
         freeParticipantControllers[freeParticipantController] = allow;
     }
 
-    function setFreeParticipant(address participant, bool free) public
+    function setFreeParticipant(address participant, bool free) public transferGateOnly()
     {
-        require (msg.sender == owner || freeParticipantControllers[msg.sender], "Not an owner or free participant controller");
         freeParticipant[participant] = free;
     }
 }

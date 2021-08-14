@@ -69,6 +69,17 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         feeControllers[feeController] = allow;
     }
 
+    function setFreeParticipantController(address freeParticipantController, bool allow) public ownerOnly()
+    {
+        freeParticipantRegistry.setFreeParticipantController(freeParticipantController, allow);
+    }
+
+    function setFreeParticipant(address participant, bool free) public
+    {
+        require (msg.sender == owner || freeParticipantRegistry.freeParticipantControllers(msg.sender), "Not an owner or free participant controller");
+        freeParticipantRegistry.setFreeParticipant(participant, free);
+    }
+
     function setFeeSplitter(address _feeSplitter) public ownerOnly()
     {
         feeSplitter = _feeSplitter;
