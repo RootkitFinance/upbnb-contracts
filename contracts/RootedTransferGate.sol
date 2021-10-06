@@ -27,6 +27,7 @@ import "./SafeMath.sol";
 import "./TokensRecoverable.sol";
 import "./ITransferGate.sol";
 import "./FreeParticipantRegistry.sol";
+import "./BlackListRegistry.sol";
 
 contract RootedTransferGate is TokensRecoverable, ITransferGate
 {   
@@ -47,6 +48,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     uint16 public feesRate;
     IPancakePair public mainPool;
     FreeParticipantRegistry public freeParticipantRegistry;
+    BlackListRegistry public blackListRegistry;
    
     uint16 public dumpTaxStartRate; 
     uint256 public dumpTaxDurationInSeconds;
@@ -95,7 +97,12 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setFreeParticipantRegistry(FreeParticipantRegistry _freeParticipantRegistry) public ownerOnly()
     {
         freeParticipantRegistry = _freeParticipantRegistry;
-    }    
+    }
+
+    function setBlackListRegistry(BlackListRegistry _blackListRegistry) public ownerOnly()
+    {
+        blackListRegistry = _blackListRegistry;
+    }
 
     function setMainPool(IPancakePair _mainPool) public ownerOnly()
     {
@@ -140,6 +147,11 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         if (unrestricted || freeParticipantRegistry.freeParticipant(from) || freeParticipantRegistry.freeParticipant(to)) 
         {
             return 0;
+        }
+
+        if (blackListRegistry.blackList(from))
+        {
+            return amount;
         }
 
         uint16 poolTaxRate = poolsTaxRates[to];

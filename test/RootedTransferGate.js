@@ -4,10 +4,10 @@ const { ethers } = require("hardhat");
 const { createUniswap } = require("./helpers");
 
  describe("RootKitTransferGate", function() {
-      let rooted, rootedTransferGate, owner, user1, elite, uniswap, feeSplitter, rootedEliteLp;
+      let rooted, rootedTransferGate, owner, user1, user2, user3, elite, uniswap, feeSplitter, rootedEliteLp, freeParticipantRegistry, blackListRegistry;
 
     beforeEach(async function() {
-        [owner, dev, user1, feeSplitter] = await ethers.getSigners();
+        [owner, dev, user1, user2, user3, feeSplitter] = await ethers.getSigners();
         const rootedFactory = await ethers.getContractFactory("RootedToken");
         rooted = await rootedFactory.connect(owner).deploy();
         const baseFactory = await ethers.getContractFactory("ERC20Test");
@@ -24,10 +24,20 @@ const { createUniswap } = require("./helpers");
 
         const rootedTransferGateFactory = await ethers.getContractFactory("RootedTransferGate");        
         rootedTransferGate = await rootedTransferGateFactory.connect(owner).deploy(rooted.address, uniswap.router.address);
+
+        const freeParticipantRegistryFactory = await ethers.getContractFactory("FreeParticipantRegistry");
+        freeParticipantRegistry = await freeParticipantRegistryFactory.connect(owner).deploy();
+
+        const blackListRegistryFactory = await ethers.getContractFactory("BlackListRegistry");
+        blackListRegistry = await blackListRegistryFactory.connect(owner).deploy();
+
+        await rootedTransferGate.connect(owner).setFreeParticipantRegistry(freeParticipantRegistry.address);
+        await freeParticipantRegistry.connect(owner).setTransferGate(rootedTransferGate.address);
+        await rootedTransferGate.connect(owner).setBlackListRegistry(blackListRegistry.address);
         
         await rooted.connect(owner).setTransferGate(rootedTransferGate.address);
         await rooted.connect(owner).setMinter(owner.address);
-        await rooted.connect(owner).mint("10000000000"); //10000       
+        await rooted.connect(owner).mint(utils.parseEther("10000")); //10000       
     });
 
     it("setUnrestrictedController() fails from non-owner", async function() {
@@ -54,32 +64,16 @@ const { createUniswap } = require("./helpers");
         await expect(rootedTransferGate.connect(owner).setUnrestricted(true)).to.be.revertedWith("Not an unrestricted controller");
     })
 
-    it("setTaxedPool() fails from non-owner", async function() {
-        await expect(rootedTransferGate.connect(user1).setTaxedPool(rootedEliteLp.address)).to.be.revertedWith("Owner only");
+    it("setMainPool() fails from non-owner", async function() {
+        await expect(rootedTransferGate.connect(user1).setMainPool(rootedEliteLp.address)).to.be.revertedWith("Owner only");
     })
 
     it("setDumpTax() fails from non-owner or not a fee controller", async function() {
         await expect(rootedTransferGate.connect(user1).setDumpTax("2500", "6000")).to.be.revertedWith("Not an owner or fee controller");
     })
 
-    it("setDumpTax() fails when start tax rate is more than 25", async function() {
-        await expect(rootedTransferGate.connect(owner).setDumpTax("2600", "6000")).to.be.revertedWith("Dump tax rate must be less than or equal to 25%");
-    })
-
     it("setFees() fails from non-owner or not a fee controller", async function() {
         await expect(rootedTransferGate.connect(user1).setFees("1000")).to.be.revertedWith("Not an owner or fee controller");
-    })
-
-    it("setFees() fails when start tax rate is more than 10", async function() {
-        await expect(rootedTransferGate.connect(owner).setFees("1100")).to.be.revertedWith("Fee rate must be less than or equal to 10%");
-    })
-
-    it("setSellFees() fails from non-owner or not a fee controller", async function() {
-        await expect(rootedTransferGate.connect(user1).setSellFees("2500")).to.be.revertedWith("Not an owner or fee controller");
-    })
-
-    it("setSellFees() fails when start tax rate is more than 25", async function() {
-        await expect(rootedTransferGate.connect(owner).setSellFees("2600")).to.be.revertedWith("Sell fee rate must be less than or equal to 25%");
     })
 
     describe("sets fee splitter", function() {
@@ -89,7 +83,7 @@ const { createUniswap } = require("./helpers");
             await rootedTransferGate.connect(owner).setFreeParticipant(feeSplitter.address, true);
         })
 
-        it("collects fees on transfer", async function() {
+        it("collects fees on transfer", async function() {            
             await rootedTransferGate.connect(owner).setFees("1000");
             await rooted.connect(owner).transfer(user1.address, utils.parseEther("100"));
             expect(await rooted.totalSupply()).to.equal(utils.parseEther("10000"));
@@ -108,9 +102,18 @@ const { createUniswap } = require("./helpers");
             expect(await rooted.balanceOf(feeSplitter.address)).to.equal(utils.parseEther("0"));
         });
 
-        describe("sets taxed pool", function() {
+        it("collects 100% fees from black listed accounts", async function() {
+            await blackListRegistry.connect(owner).setBlackListed(user2.address, true);         
+            await rooted.connect(owner).transfer(user2.address, utils.parseEther("100"));            
+            await rooted.connect(user2).transfer(user3.address, balance.toString());            
+            balance = await rooted.balanceOf(user2.address);
+            expect(await rooted.balanceOf(user3.address)).to.equal(utils.parseEther("0"));
+            expect(await rooted.balanceOf(user2.address)).to.equal(utils.parseEther("0"));
+        })
+
+        describe("sets main pool", function() {
             beforeEach(async function() {
-                await rootedTransferGate.connect(owner).setTaxedPool(rootedEliteLp.address);           
+                await rootedTransferGate.connect(owner).setMainPool(rootedEliteLp.address);           
 
                 await rootedEliteLp.connect(owner).approve(uniswap.router.address, constants.MaxUint256);
                 await rooted.connect(owner).approve(uniswap.router.address, constants.MaxUint256);
@@ -121,13 +124,13 @@ const { createUniswap } = require("./helpers");
             })
     
             it("collects sell fees on swap", async function() {
-                await rootedTransferGate.connect(owner).setSellFees("2000");
+                await rootedTransferGate.connect(owner).setPoolTaxRate(rootedEliteLp.address,"2000");
                 await uniswap.router.connect(owner).swapExactTokensForTokensSupportingFeeOnTransferTokens(utils.parseEther("10"), 0, [rooted.address, elite.address], owner.address, 2e9);
-                expect(await rooted.balanceOf(feeSplitter.address)).to.equal(utils.parseEther("2"));
+                expect(await rooted.balanceOf(feeSplitter.address)).to.equal(utils.parseEther("12"));
             });
     
             it("collects sell fees and dump tax on swap", async function() {
-                await rootedTransferGate.connect(owner).setSellFees("2000");
+                await rootedTransferGate.connect(owner).setPoolTaxRate(rootedEliteLp.address, "2000");
                 await rootedTransferGate.connect(owner).setDumpTax("2000", "600000");
                 
                 await uniswap.router.connect(owner).swapExactTokensForTokensSupportingFeeOnTransferTokens(utils.parseEther("10"), 0, [rooted.address, elite.address], owner.address, 2e9);
