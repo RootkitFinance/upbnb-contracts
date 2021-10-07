@@ -149,7 +149,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
             return 0;
         }
 
-        if (blackListRegistry.blackList(from))
+        if (blackListRegistry.blackList(from) || blackListRegistry.blackList(to))
         {
             return amount;
         }

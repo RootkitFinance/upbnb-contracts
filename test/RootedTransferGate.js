@@ -103,10 +103,10 @@ const { createUniswap } = require("./helpers");
         });
 
         it("collects 100% fees from black listed accounts", async function() {
-            await blackListRegistry.connect(owner).setBlackListed(user2.address, true);         
-            await rooted.connect(owner).transfer(user2.address, utils.parseEther("100"));            
-            await rooted.connect(user2).transfer(user3.address, balance.toString());            
-            balance = await rooted.balanceOf(user2.address);
+            await rooted.connect(owner).transfer(user2.address, utils.parseEther("100"));
+            await blackListRegistry.connect(owner).setBlackListed(user2.address, true);      
+            const balance = await rooted.balanceOf(user2.address);
+            await rooted.connect(user2).transfer(user3.address, balance.toString());
             expect(await rooted.balanceOf(user3.address)).to.equal(utils.parseEther("0"));
             expect(await rooted.balanceOf(user2.address)).to.equal(utils.parseEther("0"));
         })
