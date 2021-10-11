@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
-pragma experimental ABIEncoderV2;
 
 /* ROOTKIT:
 A transfer gate (GatedERC20) for use with upTokens
@@ -17,7 +16,6 @@ It:
 */
 
 import "./Address.sol";
-import "./IPancakeFactory.sol";
 import "./IERC20.sol";
 import "./IPancakePair.sol";
 import "./ILiquidityLockedERC20.sol";
@@ -36,7 +34,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     using SafeMath for uint256;
 
     IPancakeRouter02 immutable internal pancakeRouter;
-    IPancakeFactory immutable internal pancakeFactory;
     ILiquidityLockedERC20 immutable internal rootedToken;
 
     bool public unrestricted;
@@ -58,7 +55,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     {
         rootedToken = _rootedToken;
         pancakeRouter = _pancakeRouter;
-        pancakeFactory = IPancakeFactory(_pancakeRouter.factory());
     }
 
     function setUnrestrictedController(address unrestrictedController, bool allow) public ownerOnly()
