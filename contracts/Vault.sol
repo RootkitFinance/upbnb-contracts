@@ -22,6 +22,8 @@ contract Vault is TokensRecoverable, IVault
     IERC31337 immutable elite;
     IERC20 immutable rootedEliteLP;
     IERC20 immutable rootedBaseLP;
+    IERC20 immutable usd;
+    uint256 public totalStackUsd;
     IFloorCalculator public calculator;
     RootedTransferGate public gate;
     mapping(address => bool) public seniorVaultManager;
@@ -55,6 +57,27 @@ contract Vault is TokensRecoverable, IVault
     {
         require(seniorVaultManager[msg.sender], "Not a Senior Vault Manager");
         _;
+    }
+
+    function singleLiquditySwap(address lpTokenToRemove, uint256 lpToRemove, calldata address[] path, address lpTokenToAdd) {
+        // 1. remove lpToken remove
+        // 2. swap path using amount got from remove liq
+        // 3. add liq amount(fromSwap, fromRemove)
+    }
+
+    function doubleLiquditySwap(address lpTokenToRemove, uint256 lpToRemove, calldata address[] path0, calldata address[] path1, address lpTokenToAdd) {
+        // 1. remove lpToken remove
+        // 2. swap path0 using amount got from remove liq
+        // 3. swap path1 using amount got from remove liq
+        // 3. add liq amount(fromSwap0, fromSwap1)
+    }
+
+    function stackUsd(calldata address[] path, uint256 amount, uint256 usdToKeep) {
+        require(path[0] == path[path.length - 1]);
+        //arb
+        // 1. swap path using amount
+        // 2.
+        totalStackUsd += usdToKeep;
     }
 
     // Owner function to enable other contracts or addresses to use the Liquidity Controller
