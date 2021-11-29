@@ -48,6 +48,7 @@ contract Vault is TokensRecoverable, IVault
         IERC20 _rootedEliteLP = IERC20(_pancakeFactory.getPair(address(_elite), address(_rooted)));
         _rootedEliteLP.approve(address(_pancakeRouter), uint256(-1));
         rootedEliteLP = _rootedEliteLP;
+        _rooted.approve(address(_gate), uint256(-1));
     }
 
     modifier seniorVaultManagerOnly()
@@ -57,7 +58,7 @@ contract Vault is TokensRecoverable, IVault
     }
 
     // Owner function to enable other contracts or addresses to use the Liquidity Controller
-    function setLiquidityController(address controlAddress, bool controller) public ownerOnly()
+    function setSeniorVaultManager(address controlAddress, bool controller) public ownerOnly()
     {
         seniorVaultManager[controlAddress] = controller;
     }
@@ -66,6 +67,7 @@ contract Vault is TokensRecoverable, IVault
     {
         calculator = _calculator;
         gate = _gate;
+        rooted.approve(address(_gate), uint256(-1));
     }
 
     // Removes liquidity, buys from either pool, sets a temporary dump tax
