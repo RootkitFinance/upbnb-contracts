@@ -175,7 +175,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
             uint256 balance0 = IERC20(mainPool.token0()).balanceOf(address(mainPool));
             uint256 balance1 = IERC20(mainPool.token1()).balanceOf(address(mainPool));
      
-            uint256 amount1In = balance1 > reserve1 ? balance1 - reserve1 : 0;
+            uint256 amount1In = balance1 - reserve1;
             require((balance0.mul(1000)).mul(balance1.mul(1000).sub(amount1In.mul(3))) >= uint256(reserve0).mul(reserve1).mul(1000**2));      
 
             rooted.transferFrom(vault, address(mainPool), sendToPool);   
