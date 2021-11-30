@@ -10,6 +10,7 @@ import "./IPancakeFactory.sol";
 import "./SafeMath.sol";
 import "./IVault.sol";
 import "./IFloorCalculator.sol";
+import "./IPancakePair.sol";
 
 contract Vault is TokensRecoverable, IVault
 {
@@ -28,12 +29,13 @@ contract Vault is TokensRecoverable, IVault
     RootedTransferGate public gate;
     mapping(address => bool) public seniorVaultManager;
 
-    constructor(IPancakeRouter02 _pancakeRouter, IERC20 _base, IERC20 _rooted, IERC31337 _elite, IFloorCalculator _calculator, RootedTransferGate _gate) 
+    constructor(IPancakeRouter02 _pancakeRouter, IERC20 _base, IERC20 _rooted, IERC31337 _elite, IERC20 _usd, IFloorCalculator _calculator, RootedTransferGate _gate) 
     {
         pancakeRouter = _pancakeRouter;
         base = _base;
         elite = _elite;
         rooted = _rooted;
+        usd = _usd;
         calculator = _calculator;
         gate = _gate;
 
@@ -42,6 +44,7 @@ contract Vault is TokensRecoverable, IVault
         
         _base.approve(address(_elite), uint256(-1));
         _base.approve(address(_pancakeRouter), uint256(-1));
+        _usd.approve(address(_pancakeRouter), uint256(-1));
         _rooted.approve(address(_pancakeRouter), uint256(-1));
         IERC20 _rootedBaseLP = IERC20(_pancakeFactory.getPair(address(_base), address(_rooted)));
         _rootedBaseLP.approve(address(_pancakeRouter), uint256(-1));
@@ -59,20 +62,77 @@ contract Vault is TokensRecoverable, IVault
         _;
     }
 
-    function singleLiquditySwap(address lpTokenToRemove, uint256 lpToRemove, calldata address[] path, address lpTokenToAdd) {
-        // 1. remove lpToken remove
-        // 2. swap path using amount got from remove liq
-        // 3. add liq amount(fromSwap, fromRemove)
+    function swap(uint256 amount, address[] calldata path) public seniorVaultManagerOnly() {
     }
 
-    function doubleLiquditySwap(address lpTokenToRemove, uint256 lpToRemove, calldata address[] path0, calldata address[] path1, address lpTokenToAdd) {
-        // 1. remove lpToken remove
+    function approveRouter(IERC20 token) public seniorVaultManagerOnly() {
+        token.approve(address(pancakeRouter), uint256(-1));
+    }
+
+    function singleLiquditySwap(IPancakePair pairToRemove, uint256 amountToRemove, address[] calldata path, IPancakePair pairToAdd) public seniorVaultManagerOnly() {
+        // fist element in path (path[0]) must be in pairToRemove
+        // last element in path (path[path.length - 1]) must be in pairToAdd
+
+        // 1. remove from pairToRemove
+        // 2. swap path using amount from remove liq
+        // 3. add to pairToAdd (fromSwap, fromRemove)
+      
+        pairToRemove.transfer(address(pairToRemove), amountToRemove); // send liquidity to pair
+        (uint256 amount0, uint256 amount1) = pairToRemove.burn(address(this));
+       
+        uint256 sellAmount;
+        uint256 addAmount0;
+        address addToken0;
+        address addToken1 = path[path.length - 1];
+
+        if (pairToRemove.token0() == path[0]) {
+            sellAmount = amount0;
+            addAmount0 = amount1;
+            addToken0 = pairToRemove.token1();
+        }
+        else {
+            sellAmount = amount1;
+            addAmount0 = amount0;
+            addToken0 = pairToRemove.token0();
+        }
+
+        uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(sellAmount, 0, path, address(this), block.timestamp);
+
+        IERC20(addToken0).transfer(address(pairToAdd), addAmount0);
+        IERC20(addToken1).transfer(address(pairToAdd), amounts[1]);
+        pairToAdd.mint(address(this));
+    }
+
+    function doubleLiquditySwap(IPancakePair pairToRemove, uint256 amountToRemove, address[] calldata path0, address[] calldata path1, IPancakePair pairToAdd) public seniorVaultManagerOnly() {
+        // 1. remove from pairToRemove
         // 2. swap path0 using amount got from remove liq
         // 3. swap path1 using amount got from remove liq
-        // 3. add liq amount(fromSwap0, fromSwap1)
+        // 4. add to pairToAdd(fromSwap0, fromSwap1)
+
+        pairToRemove.transfer(address(pairToRemove), amountToRemove); // send liquidity to pair
+        (uint256 amount0, uint256 amount1) = pairToRemove.burn(address(this));
+
+        uint256 sellAmount0;
+        uint256 sellAmount1;
+        
+        if (pairToRemove.token0() == path0[0]) {
+            sellAmount0 = amount0;
+            sellAmount1 = amount1;
+        }
+        else {
+            sellAmount0 = amount1;
+            sellAmount1 = amount0;
+        }
+
+        uint256[] memory amounts0 = pancakeRouter.swapExactTokensForTokens(sellAmount0, 0, path0, address(this), block.timestamp);
+        uint256[] memory amounts1 = pancakeRouter.swapExactTokensForTokens(sellAmount1, 0, path1, address(this), block.timestamp);
+
+        IERC20(path0[path0.length - 1]).transfer(address(pairToAdd), amounts0[1]);
+        IERC20(path1[path1.length - 1]).transfer(address(pairToAdd), amounts1[1]);
+        pairToAdd.mint(address(this));
     }
 
-    function stackUsd(calldata address[] path, uint256 amount, uint256 usdToKeep) {
+    function stackUsd(address[] calldata path, uint256 amount, uint256 usdToKeep) public seniorVaultManagerOnly() {
         require(path[0] == path[path.length - 1]);
         //arb
         // 1. swap path using amount
