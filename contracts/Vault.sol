@@ -69,7 +69,7 @@ contract Vault is TokensRecoverable, IVault
         token.approve(address(pancakeRouter), uint256(-1));
     }
 
-    function singleLiquditySwap(IPancakePair pairToRemove, uint256 amountToRemove, address[] calldata path, IPancakePair pairToAdd) public seniorVaultManagerOnly() {
+    function singleLiquiditySwap(IPancakePair pairToRemove, uint256 amountToRemove, address[] calldata path, IPancakePair pairToAdd) public seniorVaultManagerOnly() {
         // fist element in path (path[0]) must be in pairToRemove
         // last element in path (path[path.length - 1]) must be in pairToAdd
 
@@ -103,7 +103,7 @@ contract Vault is TokensRecoverable, IVault
         pairToAdd.mint(address(this));
     }
 
-    function doubleLiquditySwap(IPancakePair pairToRemove, uint256 amountToRemove, address[] calldata path0, address[] calldata path1, IPancakePair pairToAdd) public seniorVaultManagerOnly() {
+    function doubleLiquiditySwap(IPancakePair pairToRemove, uint256 amountToRemove, address[] calldata path0, address[] calldata path1, IPancakePair pairToAdd) public seniorVaultManagerOnly() {
         // 1. remove from pairToRemove
         // 2. swap path0 using amount got from remove liq
         // 3. swap path1 using amount got from remove liq
