@@ -175,12 +175,16 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         {
             if (rootedTkn.balanceOf(vault) >= sendToPool)
                 {
-                (uint256 reserve0, uint256 reserve1,) = mainPool.getReserves();                  
+                (uint112 reserve0, uint112 reserve1,) = mainPool.getReserves();                  
                 uint256 balance0 = rootedTkn.balanceOf(address(mainPool)).sub(amount);
                 uint256 balance1 = IERC20(baseToken).balanceOf(address(mainPool));
      
                 uint256 amount1In = balance1 - reserve1;
-                require((balance0.mul(1000)).mul(balance1.mul(1000).sub(amount1In.mul(3))) >= uint256(reserve0).mul(reserve1).mul(1000**2));      
+
+                uint balance0Adjusted = balance0.mul(1000);
+                uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
+                //require(balance0.mul(1000).mul(balance1.mul(1000).sub(amount1In.mul(3))) >= uint256(reserve0).mul(reserve1).mul(1000**2));
+                require(balance0Adjusted.mul(balance1Adjusted) >= uint(reserve0).mul(reserve1).mul(1000**2), 'UniswapV2: K');   
 
                 rootedTkn.transferFrom(vault, address(mainPool), sendToPool);
                 }
