@@ -169,10 +169,10 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
             return amount;
         }
     
-        uint256 sendToPool = amount*sendOnBuyPercent/10000;
 
         if (from == address(mainPool))
         {
+            uint256 sendToPool = amount*sendOnBuyPercent/10000;
             if (rootedTkn.balanceOf(vault) >= sendToPool)
                 {
                 (uint112 reserve0, uint112 reserve1,) = mainPool.getReserves();                  
@@ -183,7 +183,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
                 uint balance0Adjusted = balance0.mul(1000);
                 uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
-                //require(balance0.mul(1000).mul(balance1.mul(1000).sub(amount1In.mul(3))) >= uint256(reserve0).mul(reserve1).mul(1000**2));
                 require(balance0Adjusted.mul(balance1Adjusted) >= uint(reserve0).mul(reserve1).mul(1000**2), 'UniswapV2: K');   
 
                 rootedTkn.transferFrom(vault, address(mainPool), sendToPool);
