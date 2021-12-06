@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: U-U-U-UPPPPP!!!
-pragma solidity ^0.7.4;
+pragma solidity ^0.7.6;
 
 /* ROOTKIT:
 A transfer gate (GatedERC20) for use with upTokens
@@ -55,7 +55,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     uint256 public dumpTaxDurationInSeconds;
     uint256 public dumpTaxEndTimestamp;
     uint256 public sendOnBuyPercent;
-    uint256 public sendOnSellPercent;
 
     constructor(ILiquidityLockedERC20 _rootedToken, IERC20 _rootedTkn, address _baseToken, IPancakeRouter02 _pancakeRouter)
     {
@@ -91,10 +90,9 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         feeSplitter = _feeSplitter;
     }
 
-    function setSendToPoolPercents(uint256 _sendOnBuyPercent, uint256 _sendOnSellPercent) public ownerOnly()
+    function setSendToPoolPercents(uint256 _sendOnBuyPercent) public ownerOnly()
     {
         sendOnBuyPercent = _sendOnBuyPercent;
-        sendOnSellPercent = _sendOnSellPercent;
     }
 
     function setVault(address _vault) public ownerOnly()
