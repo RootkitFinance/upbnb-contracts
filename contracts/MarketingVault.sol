@@ -6,7 +6,7 @@ import "./TokensRecoverable.sol";
 // Contract to hold marketing funds. Owner can approve addresses
 // for limited amounts at a time
 
-contract SideVault is TokensRecoverable
+contract MarketingVault is TokensRecoverable
 {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
