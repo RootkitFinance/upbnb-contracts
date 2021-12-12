@@ -19,7 +19,6 @@ contract FeeSplitter is TokensRecoverable
     address public rootFeederAddress;
     address public immutable deployerAddress;
     IPancakeRouter02 public immutable router;
-    IERC20 public immutable chainToken;
    
     mapping (IGatedERC20 => uint256) public burnRates;
     mapping (IGatedERC20 => uint256) public sellRates;
@@ -39,7 +38,6 @@ contract FeeSplitter is TokensRecoverable
         devAddress = _devAddress;
         rootFeederAddress = _rootFeederAddress;
         router = _router;
-        chainToken = IERC20(_router.WETH());   
     }
 
     function setDevAddress(address _devAddress) public
@@ -99,7 +97,7 @@ contract FeeSplitter is TokensRecoverable
 
     function setSellPath(IGatedERC20 token, address[] memory path) public ownerOnly()
     {
-        require (path[0] == address(token) && path[path.length - 1] == address(chainToken), "Invalid path");
+        require (path[0] == address(token), "Invalid path");
 
         sellPaths[token] = path;
     }
@@ -120,11 +118,14 @@ contract FeeSplitter is TokensRecoverable
             uint256 sellAmount = sellRates[token] * balance / 10000;
             
             address[] memory path = sellPaths[token];
-            uint256[] memory amounts = router.swapExactTokensForTokens(sellAmount, 0, path, address(this), block.timestamp);
+            IERC20 resultToken = IERC20(path[path.length - 1]);
+            uint256 resultTokenBalance = resultToken.balanceOf(address(this));
+            router.swapExactTokensForTokensSupportingFeeOnTransferTokens(sellAmount, 0, path, address(this), block.timestamp);
+            uint256 amountOut = resultToken.balanceOf(address(this)) - resultTokenBalance;
 
             address[] memory collectors = chainTokenFeeCollectors[token];
             uint256[] memory rates = chainTokenFeeRates[token];
-            distribute(chainToken, amounts[1], collectors, rates);
+            distribute(resultToken, amountOut, collectors, rates);
         }
 
         if (keepRates[token] > 0)
