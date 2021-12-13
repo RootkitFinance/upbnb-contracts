@@ -26,7 +26,6 @@ import "./TokensRecoverable.sol";
 import "./ITransferGate.sol";
 import "./FreeParticipantRegistry.sol";
 import "./BlackListRegistry.sol";
-import "./PancakeLibrary.sol";
 
 contract RootedTransferGate is TokensRecoverable, ITransferGate
 {   
@@ -36,8 +35,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
     IPancakeRouter02 immutable internal pancakeRouter;
     ILiquidityLockedERC20 immutable internal rootedToken;
-    address immutable internal baseToken;
-    IERC20 immutable internal rootedTkn;
 
     bool public unrestricted;
     mapping (address => bool) public unrestrictedControllers;
@@ -45,7 +42,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     mapping (address => uint16) public poolsTaxRates;
 
     address public override feeSplitter;
-    address public vault;
     uint16 public feesRate;
     IPancakePair public mainPool;
     FreeParticipantRegistry public freeParticipantRegistry;
@@ -54,13 +50,10 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     uint16 public dumpTaxStartRate; 
     uint256 public dumpTaxDurationInSeconds;
     uint256 public dumpTaxEndTimestamp;
-    uint256 public sendOnBuyPercent;
 
-    constructor(ILiquidityLockedERC20 _rootedToken, IERC20 _rootedTkn, address _baseToken, IPancakeRouter02 _pancakeRouter)
+    constructor(ILiquidityLockedERC20 _rootedToken, IPancakeRouter02 _pancakeRouter)
     {
         rootedToken = _rootedToken;
-        rootedTkn = _rootedTkn;
-        baseToken = _baseToken;
         pancakeRouter = _pancakeRouter;
     }
 
@@ -90,16 +83,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         feeSplitter = _feeSplitter;
     }
 
-    function setSendToPoolPercents(uint256 _sendOnBuyPercent) public ownerOnly()
-    {
-        sendOnBuyPercent = _sendOnBuyPercent;
-    }
-
-    function setVault(address _vault) public ownerOnly()
-    {
-        vault = _vault;
-    }
-
     function setUnrestricted(bool _unrestricted) public
     {
         require (unrestrictedControllers[msg.sender], "Not an unrestricted controller");
@@ -115,14 +98,14 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setBlackListRegistry(BlackListRegistry _blackListRegistry) public ownerOnly()
     {
         blackListRegistry = _blackListRegistry;
-    }
+    }    
 
     function setMainPool(IPancakePair _mainPool) public ownerOnly()
     {
         mainPool = _mainPool;
     }
 
-     function setPoolTaxRate(address pool, uint16 taxRate) public ownerOnly()
+    function setPoolTaxRate(address pool, uint16 taxRate) public ownerOnly()
     {
         require (taxRate <= 10000, "Fee rate must be less than or equal to 100%");
         poolsTaxRates[pool] = taxRate;        
@@ -166,37 +149,15 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         {
             return amount;
         }
-    
-
-        if (from == address(mainPool))
-        {
-            uint256 sendToPool = amount*sendOnBuyPercent/10000;
-            if (rootedTkn.balanceOf(vault) >= sendToPool)
-                {
-                (uint112 reserve0, uint112 reserve1,) = mainPool.getReserves();                  
-                uint256 balance0 = rootedTkn.balanceOf(address(mainPool)).sub(amount);
-                uint256 balance1 = IERC20(baseToken).balanceOf(address(mainPool));
-     
-                uint256 amount1In = balance1 - reserve1;
-
-                uint balance0Adjusted = balance0.mul(1000);
-                uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
-                require(balance0Adjusted.mul(balance1Adjusted) >= uint(reserve0).mul(reserve1).mul(1000**2), 'UniswapV2: K');   
-
-                rootedTkn.transferFrom(vault, address(mainPool), sendToPool);
-                }
-
-            return amount * feesRate / 10000;
-        }
 
         uint16 poolTaxRate = poolsTaxRates[to];
 
-        if (poolTaxRate > 0) 
+        if (poolTaxRate > feesRate) 
         {
             uint256 totalTax = getDumpTax() + poolTaxRate;
             return totalTax >= 10000 ? amount : amount * totalTax / 10000;
         }
 
         return amount * feesRate / 10000;
-    }   
+    }      
 }
