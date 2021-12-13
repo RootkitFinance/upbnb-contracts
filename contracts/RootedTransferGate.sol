@@ -98,14 +98,14 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setBlackListRegistry(BlackListRegistry _blackListRegistry) public ownerOnly()
     {
         blackListRegistry = _blackListRegistry;
-    }    
+    }
 
     function setMainPool(IPancakePair _mainPool) public ownerOnly()
     {
         mainPool = _mainPool;
     }
 
-    function setPoolTaxRate(address pool, uint16 taxRate) public ownerOnly()
+     function setPoolTaxRate(address pool, uint16 taxRate) public ownerOnly()
     {
         require (taxRate <= 10000, "Fee rate must be less than or equal to 100%");
         poolsTaxRates[pool] = taxRate;        
@@ -159,5 +159,5 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         }
 
         return amount * feesRate / 10000;
-    }      
+    }   
 }
