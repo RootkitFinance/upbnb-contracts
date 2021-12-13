@@ -118,14 +118,12 @@ contract FeeSplitter is TokensRecoverable
             uint256 sellAmount = sellRates[token] * balance / 10000;
             
             address[] memory path = sellPaths[token];
-            IERC20 resultToken = IERC20(path[path.length - 1]);
-            uint256 resultTokenBalance = resultToken.balanceOf(address(this));
-            router.swapExactTokensForTokensSupportingFeeOnTransferTokens(sellAmount, 0, path, address(this), block.timestamp);
-            uint256 amountOut = resultToken.balanceOf(address(this)) - resultTokenBalance;
-
+            uint256[] memory amounts = router.swapExactTokensForTokens(sellAmount, 0, path, address(this), block.timestamp);
+ 
             address[] memory collectors = chainTokenFeeCollectors[token];
             uint256[] memory rates = chainTokenFeeRates[token];
-            distribute(resultToken, amountOut, collectors, rates);
+            uint256 lastIndex = path.length - 1;
+            distribute(IERC20(path[lastIndex]), amounts[lastIndex], collectors, rates);
         }
 
         if (keepRates[token] > 0)
