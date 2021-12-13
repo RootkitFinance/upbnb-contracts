@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: U-U-U-UPPPPP!!!
-pragma solidity ^0.7.6;
+pragma solidity ^0.7.4;
 
 /* ROOTKIT:
 A transfer gate (GatedERC20) for use with upTokens
