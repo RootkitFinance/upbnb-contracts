@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.6;
 
-
 import "./TokensRecoverable.sol";
 import "./RootedTransferGate.sol";
 
@@ -42,5 +41,4 @@ contract SingleSideLiquidityAdder is TokensRecoverable {
 
         gate.setUnrestricted(false);
     }
-
 }

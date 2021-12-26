@@ -21,7 +21,11 @@
         const calculator = "0x2Cf93f951C44980Fb1790524d4f1a32A5dC7dadC";
         const oldVault = "0xd22F3E99F7e16566A104A47c9c15e97C6B4Ad122";
 
-        const signer = (new ethers.providers.Web3Provider(web3Provider)).getSigner();      
+        const signer = (new ethers.providers.Web3Provider(web3Provider)).getSigner();
+        
+        //=======================================================================================
+        //                                          DEPLOY
+        //=======================================================================================
 
         // Vault
         const vaultMetadata = JSON.parse(await remix.call('fileManager', 'getFile', `browser/artifacts/Vault.json`));    
@@ -76,49 +80,60 @@
         await txResponse.wait();
         txResponse = await gateContract.setFreeParticipant(singleSideLiquidityAdderContract.address, true);
         await txResponse.wait();
-        console.log('Vault, arbitrage, and SingleSideLiquidityAdder are Free Participants in the gate.');
+        console.log('Vault, Arbitrage, and SingleSideLiquidityAdder are Free Participants in the gate.');
 
+        //=======================================================================================
+        //                                      RECOVER TOKENS
+        //=======================================================================================
 
-        //Recover tokens
         const oldVaultMetadata = JSON.parse(await remix.call('fileManager', 'getFile', `browser/artifacts/ITokensRecoverable.json`));
         const oldVaultFactory = new ethers.ContractFactory(oldVaultMetadata.abi, oldVaultMetadata.data.bytecode.object, signer);  
-        const oldVaultContract = await oldVaultFactory.attach(oldVault);
-
-        // Recovering Base from Vault
+        const oldVaultContract = await oldVaultFactory.attach(oldVault);        
         const erc20Metadata = JSON.parse(await remix.call('fileManager', 'getFile', `browser/artifacts/IERC20.json`));
         const erc20Factory = new ethers.ContractFactory(erc20Metadata.abi, erc20Metadata.data.bytecode.object, signer);  
+        
+        // Recovering Base from Vault
         const baseContract = await erc20Factory.attach(baseToken);
-
         let balanceBefore = await baseContract.balanceOf(deployer);
         await oldVaultContract.recoverTokens(baseToken);
         let balanceAfter = await baseContract.balanceOf(deployer);
         let recovered = balanceAfter.sub(balanceBefore);
         await baseContract.transfer(vaultContract.address, recovered);
-        console.log(`${ethers.utils.formatEther(recovered)} of Base recovered and sent to new vault`);
+        console.log(`${ethers.utils.formatEther(recovered)} Base tokens recovered and sent to the new vault`);
 
         // Recovering Elite from Vault
         const eliteContract = await erc20Factory.attach(eliteToken);
-
-        let balanceBefore = await eliteContract.balanceOf(deployer);
         await oldVaultContract.recoverTokens(eliteToken);
-        let balanceAfter = await eliteContract.balanceOf(deployer);
-        let recovered = balanceAfter.sub(balanceBefore);
+        recovered = await eliteContract.balanceOf(deployer);
         await eliteContract.transfer(vaultContract.address, recovered);
-        console.log(`${ethers.utils.formatEther(recovered)} of Elite recovered and sent to new vault`);
+        console.log(`${ethers.utils.formatEther(recovered)} Elite tokens recovered and sent to the new vault`);
 
+        // Recovering Rooted from Vault
+        const rootedContract = await erc20Factory.attach(rootedToken);
+        balanceBefore = await rootedContract.balanceOf(deployer);
+        await oldVaultContract.recoverTokens(rootedToken);
+        balanceAfter = await rootedContract.balanceOf(deployer);
+        recovered = balanceAfter.sub(balanceBefore);
+        await rootedContract.transfer(vaultContract.address, recovered);
+        console.log(`${ethers.utils.formatEther(recovered)} Rooted tokens recovered and sent to the new vault`);
 
+        // Recovering Base Pool LPs from Vault
+        const basePoolContract = await erc20Factory.attach(basePool);
+        await oldVaultContract.recoverTokens(basePool);
+        recovered = await basePoolContract.balanceOf(deployer);
+        await basePoolContract.transfer(vaultContract.address, recovered);
+        console.log(`${ethers.utils.formatEther(recovered)} Base Pool LPs recovered and sent to the new vault`);
 
-
-        await vaultContract.recoverTokens(eliteToken);
-        await vaultContract.recoverTokens(rootedToken);
-        await vaultContract.recoverTokens(basePool);
-        await vaultContract.recoverTokens(elitePool);
-
-
+        // Recovering Elite Pool LPs from Vault
+        const elitePoolContract = await erc20Factory.attach(elitePool);
+        await oldVaultContract.recoverTokens(elitePool);
+        recovered = await elitePoolContract.balanceOf(deployer);
+        await elitePoolContract.transfer(vaultContract.address, recovered);
+        console.log(`${ethers.utils.formatEther(recovered)} Elite Pool LPs recovered and sent to the new vault`);
 
         console.log('Done!');
-
-    } catch (e) {
+    } 
+    catch (e) {
         console.log(e)
     }
 })()

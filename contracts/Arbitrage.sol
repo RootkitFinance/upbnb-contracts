@@ -67,9 +67,9 @@ contract Arbitrage is TokensRecoverable
         path[2] = address(baseToken);
 
         uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(eliteAmount, minAmountOut, path, address(this), block.timestamp);
-
         uint256 baseAmount = amounts[2];
         require(baseAmount > eliteAmount, "No profit");
+
         emit Profit(baseAmount - eliteAmount);
     }
 }
