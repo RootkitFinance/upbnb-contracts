@@ -74,11 +74,11 @@
         await txResponse.wait();
         console.log('singleSideLiquidityAdder is UnrestrictedController in the gate.');
 
-        txResponse = await gateContract.setFreeParticipant(vaultContract.address, true);
+        txResponse = await transferGateContract.setFreeParticipant(vaultContract.address, true);
         await txResponse.wait();
-        txResponse = await gateContract.setFreeParticipant(arbitrageContract.address, true);
+        txResponse = await transferGateContract.setFreeParticipant(arbitrageContract.address, true);
         await txResponse.wait();
-        txResponse = await gateContract.setFreeParticipant(singleSideLiquidityAdderContract.address, true);
+        txResponse = await transferGateContract.setFreeParticipant(singleSideLiquidityAdderContract.address, true);
         await txResponse.wait();
         console.log('Vault, Arbitrage, and SingleSideLiquidityAdder are Free Participants in the gate.');
 
