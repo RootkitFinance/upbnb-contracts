@@ -58,10 +58,10 @@ contract Vault is TokensRecoverable, IVault
         _;
     }
 
-    // Owner function to enable other contracts or addresses to use the Liquidity Controller
-    function setLiquidityController(address controlAddress, bool controller) public ownerOnly()
+    // Owner function to enable other contracts or addresses to use the Vault
+    function setSeniorVaultManager(address maangerAddress, bool allow) public ownerOnly()
     {
-        seniorVaultManager[controlAddress] = controller;
+        seniorVaultManager[maangerAddress] = allow;
     }
 
     function setCalculatorAndGate(IFloorCalculator _calculator, RootedTransferGate _gate) public ownerOnly()
@@ -83,26 +83,17 @@ contract Vault is TokensRecoverable, IVault
     // Use Base tokens held by this contract to buy from the Base Pool and sell in the Elite Pool
     function balancePriceBase(uint256 amount, uint256 minAmountOut) public override seniorVaultManagerOnly()
     {
-        address[] memory path = new address[](2);
-        path[0] = address(base);
-        path[1] = address(rooted);
-        path[2] = address(elite);
-
-        uint256[] memory amounts = pancakeRouter.swapExactTokensForTokens(amount, minAmountOut, path, address(this), block.timestamp);
-        elite.withdrawTokens(amounts[2]);
+        amount = buyRootedToken(address(base), amount, 0);
+        amount = sellRootedToken(address(elite), amount, minAmountOut);
+        elite.withdrawTokens(amount);
     }
 
     // Use Base tokens held by this contract to buy from the Elite Pool and sell in the Base Pool
     function balancePriceElite(uint256 amount, uint256 minAmountOut) public override seniorVaultManagerOnly()
-    {        
+    {   
         elite.depositTokens(amount);
-
-        address[] memory path = new address[](2);
-        path[0] = address(elite);
-        path[1] = address(rooted);
-        path[2] = address(base);
-
-        pancakeRouter.swapExactTokensForTokens(amount, minAmountOut, path, address(this), block.timestamp);
+        amount = buyRootedToken(address(elite), amount, 0);
+        amount = sellRootedToken(address(base), amount, minAmountOut);
     }
 
     // Uses value in the controller to buy
