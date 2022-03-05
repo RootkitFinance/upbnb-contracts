@@ -71,6 +71,14 @@ contract ArbVault is TokensRecoverable, IArbVault {
         allPools.push(pool);
     }
 
+    function allPoolsLength() public view override arbManagerOnly() returns (uint256){
+        return allPools.length;
+    }
+
+    function tokenPoolsLength(address token) public view override arbManagerOnly() returns (uint256){
+        return allPoolsForToken[token].length;
+    }
+
     function approveSomething(IERC20 token, address toApprove) public override arbManagerOnly() {
         token.approve(toApprove, uint(-1));
     }
