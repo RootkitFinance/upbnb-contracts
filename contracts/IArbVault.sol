@@ -3,7 +3,7 @@ pragma solidity ^0.7.6;
 
 import "./IEmpirePair.sol";
 import "./IEmpireRouter.sol";
-import "./IERC20.sol";
+import "./IWrappedERC20.sol";
 
 interface IArbVault {
 
@@ -25,6 +25,9 @@ interface IArbVault {
     function addLiquidity(address tokenA, uint256 amountA, address tokenB, uint256 amountB, IEmpireRouter router) external;
     function addLiqWithoutSlippage(address tokenA, address tokenB, uint256 amountA, uint256 amountB, IEmpireRouter router) external;
     function removeLiquidity(address lpToken, uint256 lpAmount) external;
+
+    function wrapToElite(uint256 baseAmount, IWrappedERC20 wrappedToken) external;
+    function unwrapElite(uint256 eliteAmount, IWrappedERC20 wrappedToken) external;
 
     function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) external returns (uint256 amountOut);
     function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut) external returns (uint256 amountIn);

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.6;
+pragma abicoder v2;
 
 import "./TokensRecoverable.sol";
 import "./IEmpireRouter.sol";
@@ -8,9 +9,11 @@ import "./IERC20.sol";
 import "./ITransferGate.sol";
 import "./SafeMath.sol";
 import "./SafeERC20.sol";
-import "./IArbVault.sol"; // update
+import "./IArbVault.sol";
+import "./Multicall.sol";
+import "./IWrappedERC20.sol";
 
-contract ArbVault is TokensRecoverable, IArbVault {
+contract ArbVault is TokensRecoverable, IArbVault, Multicall {
     using SafeMath for uint256;
     using SafeERC20 for IERC20; 
 
@@ -109,6 +112,16 @@ contract ArbVault is TokensRecoverable, IArbVault {
     function removeLiquidity(address lpToken, uint256 lpAmount) public override arbManagerOnly() {
         IERC20(lpToken).transfer (address(lpToken), lpAmount);
         IEmpirePair(lpToken).burn(address(this));
+    }
+
+    function wrapToElite(uint256 baseAmount, IWrappedERC20 wrappedToken) public override arbManagerOnly()
+    {
+        wrappedToken.depositTokens(baseAmount);
+    }
+
+    function unwrapElite(uint256 eliteAmount, IWrappedERC20 wrappedToken) public override arbManagerOnly() 
+    {
+        wrappedToken.withdrawTokens(eliteAmount);
     }
 
     // internal functions
